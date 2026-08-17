@@ -235,6 +235,12 @@ small{font-size:11.5px}
 .btn.primary{background:linear-gradient(135deg,var(--amber),#ff7a2e);color:#1a1205;border:0}
 .btn.danger{color:var(--red);border-color:rgba(255,77,94,.4)}
 .btn:hover{filter:brightness(1.08)}
+.qrow{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:7px 10px;border-radius:9px;margin-bottom:8px}
+.qrow.up{background:rgba(255,176,46,.1);border:1px solid rgba(255,176,46,.35);color:var(--amber)}
+.qrow.pend{background:rgba(77,159,255,.1);border:1px solid rgba(77,159,255,.35);color:var(--blue)}
+.qrow.fail{background:rgba(255,77,94,.1);border:1px solid rgba(255,77,94,.35);color:var(--red);flex-wrap:wrap}
+.qrow.fail .btn{color:var(--text)}
+.qrow.fail .btn.danger{color:var(--red);border-color:rgba(255,77,94,.4)}
 input[type=text],input[type=password]{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;width:100%}
 input[type=text]:focus{border-color:#3a4b5e;outline:none}
 </style>
@@ -373,6 +379,8 @@ input[type=text]:focus{border-color:#3a4b5e;outline:none}
         <div class="card">
           <h3>Cloud event clips <span class="spacer">☁️</span></h3>
           <div id="driveBanner"></div>
+          <div id="driveQueue"></div>
+          <div id="driveMeter"></div>
           <div id="clipList"></div>
         </div>
 
@@ -584,6 +592,7 @@ function renderClips(){
     const b2=$('#driveConnectBtn2'); if(b2) b2.addEventListener('click',()=>Drive.connect());
   }
   if(Drive.connected){
+    Drive.renderQueue(); Drive.refreshMeter();
     el.innerHTML='<p class="muted" style="margin:6px 0 2px">Loading Drive clips…</p>';
     Drive.list().then(files=>{
       if(!files.length){ el.innerHTML='<p class="muted" style="margin:6px 0 2px">No clips in Drive yet. Protected clips will appear here.</p>'; return; }
@@ -972,13 +981,14 @@ function useDemoFeed(){
    It survives reloads and is downloadable — no server needed.
    ============================================================ */
 const FS={
-  ok:false, root:null, recDir:null, clipDir:null,
+  ok:false, root:null, recDir:null, clipDir:null, pendingDir:null,
   async init(){
     try{
       if(!('storage' in navigator)||!navigator.storage||!navigator.storage.getDirectory) return false;
       this.root=await navigator.storage.getDirectory();
       this.recDir=await this.root.getDirectoryHandle('recordings',{create:true});
       this.clipDir=await this.root.getDirectoryHandle('clips',{create:true});
+      this.pendingDir=await this.root.getDirectoryHandle('pending',{create:true});
       this.ok=true; return true;
     }catch(e){ this.ok=false; return false; }
   },
@@ -1081,6 +1091,9 @@ async function persistSnapshot(){
    ============================================================ */
 const Drive={
   clientId:'', token:null, tokenClient:null, connected:false, email:null, folderId:null, _lastEvent:0,
+  queue:[], _processing:false, MAX_ATTEMPTS:6, _lastMeter:0,
+  online(){ return typeof navigator==='undefined'||navigator.onLine!==false; },
+  backoff(a){ return Math.min(10000*Math.pow(2,a-1), 300000); }, // 10s..5min
   setClientId(id){ this.clientId=id||''; },
   init(){
     if(!this.clientId||typeof window==='undefined'||!window.google||!window.google.accounts||!window.google.accounts.oauth2) return;
@@ -1098,6 +1111,7 @@ const Drive={
       this.token=r.access_token; this.connected=true;
       try{store.setItem('sdc_drive','1');}catch(_){}
       this.fetchEmail(); renderClips(); toast('☁️ Connected to Google Drive','ok');
+      this.processQueue();
     } else this.connected=false;
   },
   async connect(){
@@ -1145,12 +1159,11 @@ const Drive={
     return r.json();
   },
   async uploadClip(name, blob){
-    if(!this.connected||!settings.cloudUpload) return;
-    try{ await this.upload(name, blob, 'video/webm'); toast('☁️ Clip uploaded to Drive','ok'); renderClips(); }
-    catch(e){ toast('☁️ Upload failed: '+String((e&&e.message)||'error').slice(0,90)); }
+    if(!settings.cloudUpload) return;
+    this.enqueue(name, blob, 'video/webm');
   },
   async uploadSnapshot(prefix){
-    if(!this.connected||!settings.cloudUpload) return;
+    if(!settings.cloudUpload) return;
     if(prefix==='event_' && Date.now()-this._lastEvent<60000) return;   // throttle demo events
     if(prefix==='event_') this._lastEvent=Date.now();
     try{
@@ -1159,9 +1172,135 @@ const Drive={
       if(!canvas.toBlob) return;
       const blob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.85));
       if(!blob) return;
-      await this.upload((prefix||'snap_')+stamp()+'.jpg', blob, 'image/jpeg');
-      toast('☁️ Event clip uploaded to Drive','ok'); renderClips();
+      this.enqueue((prefix||'snap_')+stamp()+'.jpg', blob, 'image/jpeg');
     }catch(e){}
+  },
+
+  /* ---------- upload queue (offline-tolerant, auto-retry) ---------- */
+  async enqueue(name, blob, mime){
+    const item={id:'q'+Date.now()+Math.random().toString(36).slice(2,7), name, blob, mime, attempts:0, nextTry:0, failed:false, uploading:false};
+    this.queue.push(item);
+    await this.persistItem(item);
+    if(!this.online()) toast('📡 Offline — queued for upload when back online');
+    this.renderQueue();
+    this.processQueue();
+  },
+  async persistItem(item){
+    await FS.init();
+    if(FS.ok){ try{ await FS.write(FS.pendingDir, item.id, item.blob); }catch(_){} }
+    this.saveManifest();
+  },
+  saveManifest(){
+    try{ store.setItem('sdc_queue', JSON.stringify(this.queue.map(i=>({id:i.id,name:i.name,mime:i.mime,attempts:i.attempts,nextTry:i.nextTry,failed:!!i.failed})))); }catch(_){}
+  },
+  async restoreQueue(){
+    let man=[];
+    try{ man=JSON.parse(store.getItem('sdc_queue')||'[]'); }catch(_){}
+    if(!man.length) return;
+    await FS.init();
+    for(const m of man){
+      let blob=null;
+      if(FS.ok){ try{ blob=await FS.readFile(FS.pendingDir, m.id); }catch(_){} }
+      if(blob){ this.queue.push({id:m.id,name:m.name,blob,mime:m.mime,attempts:m.attempts||0,nextTry:m.nextTry||0,failed:!!m.failed,uploading:false}); }
+    }
+    this.saveManifest(); this.renderQueue();
+  },
+  async removeItem(id){
+    this.queue=this.queue.filter(i=>i.id!==id);
+    await FS.init();
+    if(FS.ok){ try{ await FS.remove(FS.pendingDir, id); }catch(_){} }
+    this.saveManifest(); this.renderQueue();
+  },
+  async processQueue(){
+    if(this._processing) return;
+    this._processing=true;
+    try{
+      for(;;){
+        if(!this.connected||!this.token) break;
+        if(!this.online()) break;
+        const now=Date.now();
+        const item=this.queue.find(i=>!i.failed&&!i.uploading&&i.nextTry<=now);
+        if(!item) break;
+        item.uploading=true; this.renderQueue();
+        try{
+          await this.upload(item.name, item.blob, item.mime);
+          await this.removeItem(item.id);
+          toast('☁️ Uploaded '+item.name,'ok');
+          renderClips(); this.refreshMeter(true);
+        }catch(e){
+          item.uploading=false; item.attempts++;
+          if(item.attempts>=this.MAX_ATTEMPTS){ item.failed=true; }
+          else item.nextTry=Date.now()+this.backoff(item.attempts);
+          this.saveManifest();
+        }
+        this.renderQueue();
+      }
+    }finally{ this._processing=false; }
+    this.renderQueue();
+  },
+  retryFailed(){
+    this.queue.forEach(i=>{ if(i.failed){ i.failed=false; i.attempts=0; i.nextTry=0; } });
+    this.saveManifest(); this.renderQueue(); this.processQueue();
+  },
+  dismissFailed(){
+    const doomed=this.queue.filter(i=>i.failed);
+    this.queue=this.queue.filter(i=>!i.failed);
+    doomed.forEach(i=>{ if(FS.ok) FS.remove(FS.pendingDir,i.id); });
+    this.saveManifest(); this.renderQueue();
+  },
+  renderQueue(){
+    const el=$('#driveQueue'); if(!el) return;
+    if(!this.connected){ el.innerHTML=''; return; }
+    const uploading=this.queue.filter(i=>i.uploading).length;
+    const pending=this.queue.filter(i=>!i.failed&&!i.uploading).length;
+    const failed=this.queue.filter(i=>i.failed).length;
+    let html='';
+    if(uploading) html+=`<div class="qrow up">⏫ Uploading…</div>`;
+    if(pending)  html+=`<div class="qrow pend">⏳ ${pending} upload${pending===1?'':'s'} pending — will retry automatically</div>`;
+    if(failed)   html+=`<div class="qrow fail">⚠️ ${failed} upload${failed===1?'':'s'} failed after retries <button class="btn" id="qRetry">Retry</button><button class="btn danger" id="qDrop">Dismiss</button></div>`;
+    if(html){ el.innerHTML=html;
+      const rt=$('#qRetry'); if(rt) rt.addEventListener('click',()=>Drive.retryFailed());
+      const dp=$('#qDrop'); if(dp) dp.addEventListener('click',()=>Drive.dismissFailed());
+    } else el.innerHTML='';
+  },
+
+  /* ---------- Drive storage meter ---------- */
+  async getQuota(){
+    try{
+      const d=await this.api('GET','https://www.googleapis.com/drive/v3/about?fields=storageQuota,user(emailAddress)');
+      if(d.user&&d.user.emailAddress) this.email=d.user.emailAddress;
+      const q=d.storageQuota||{};
+      return {usage:Number(q.usage)||0, limit:Number(q.limit)||0};
+    }catch(e){ return {usage:0, limit:0}; }
+  },
+  async folderSummary(){
+    if(!this.connected) return {count:0,bytes:0};
+    try{
+      await this.ensureFolder();
+      const q=encodeURIComponent("'"+this.folderId+"' in parents and trashed=false");
+      const d=await this.api('GET','https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(size)&pageSize=1000');
+      const files=d.files||[];
+      return {count:files.length, bytes:files.reduce((a,f)=>a+(Number(f.size)||0),0)};
+    }catch(e){ return {count:0,bytes:0}; }
+  },
+  async refreshMeter(force){
+    const el=$('#driveMeter'); if(!el) return;
+    if(!this.connected){ el.innerHTML=''; return; }
+    if(!force && Date.now()-this._lastMeter<30000) return;
+    this._lastMeter=Date.now();
+    const [q,fs]=await Promise.all([this.getQuota(), this.folderSummary()]);
+    let html='';
+    if(q.limit>0){
+      const pct=Math.min(100,q.usage/q.limit*100);
+      html+=`<div style="margin:2px 0 10px">
+        <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:4px">
+          <span>Google Drive storage</span><span>${fmtBytes(q.usage)} / ${fmtBytes(q.limit)}</span>
+        </div>
+        <div class="bar" style="margin-top:0"><i style="width:${pct.toFixed(1)}%"></i></div>
+      </div>`;
+    }
+    html+=`<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">This app\u2019s folder: <b style="color:var(--text)">${fs.count}</b> file${fs.count===1?'':'s'} · ${fmtBytes(fs.bytes)}</div>`;
+    el.innerHTML=html;
   },
   async list(){
     if(!this.connected) return [];
@@ -1456,10 +1595,12 @@ async function start(useDemo){
 
 /* boot — real camera first, demo only as fallback */
 bind(); buildZones(); updateHUD(); renderClips(); renderDigest(); updateStats();
-FS.init().then(()=>{ refreshStorage(); setInterval(refreshStorage,15000); });
+FS.init().then(()=>{ refreshStorage(); setInterval(refreshStorage,15000); Drive.restoreQueue().then(()=>Drive.processQueue()); });
 Drive.setClientId(settings.driveClientId||'');
 { const inp=$('#driveClientIdInput'); if(inp) inp.value=settings.driveClientId||''; }
 if(settings.driveClientId) driveInitPoll();
+setInterval(()=>Drive.processQueue(), 8000);
+if(typeof window!=='undefined'){ window.addEventListener('online',()=>{ Drive.processQueue(); }); }
 try{ if(store.getItem('sdc_seen')){ $('#welcome').style.display='none'; start(false);} else { $('#welcome').style.display='grid'; } }
 catch(_){ $('#welcome').style.display='grid'; }
 function updateStats(){ $('#statEvents').textContent=events.length; }

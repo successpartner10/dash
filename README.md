@@ -169,7 +169,7 @@ Settings persist in `localStorage` (with an in-memory fallback for sandboxed pre
 | Loop recording | Simulated counter | ✅ real `MediaRecorder`, **persisted to OPFS** |
 | Storage meter | Simulated | ✅ real `navigator.storage.estimate()` usage/quota |
 | License-plate capture | Simulated plate strings | ⚠️ needs on-device OCR (see roadmap) |
-| Cloud upload | Simulated until you connect Drive | ✅ **real Google Drive upload** (needs your OAuth Client ID) |
+| Cloud upload | Simulated until you connect Drive | ✅ **real Google Drive upload** (needs your OAuth Client ID) — offline queue + auto-retry |
 | Push notifications | Browser notifications only | ⚠️ true push needs a backend (FCM/APNs) |
 | True background parking mode | n/a | ⚠️ needs a native wrapper |
 
@@ -200,6 +200,23 @@ Services) — **no backend needed**, so it works on GitHub Pages.
 
 Now protected clips upload for real. The **Cloud event clips** panel lists your Drive files
 with real sizes/timestamps and a **⬇ download** button. Sign out anytime (it revokes the token).
+
+### Offline queue & auto-retry
+Uploads never just fail:
+
+- If you're **offline**, clips wait in a queue (persisted in the OPFS `pending/` folder, so
+  they survive a page reload) and upload automatically when you're back online.
+- Failed uploads **retry automatically with exponential backoff** (10s → 20s → … → capped at
+  5 min). After 6 attempts an item is marked failed — with a **Retry** / **Dismiss** button in
+  the cloud panel.
+- The panel shows live queue state: ⏫ uploading / ⏳ pending / ⚠️ failed.
+
+### Drive storage meter
+When connected, the cloud panel shows:
+
+- **Google Drive storage** — your account's real usage vs. quota
+  (`about.storageQuota`), rendered as a progress bar.
+- **This app's folder** — file count and total bytes in the “Smart Dash Cam” folder.
 
 ### Notes
 
