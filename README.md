@@ -36,7 +36,7 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 - **Live remote video** — stream the view from anywhere
 - **Two-way talk** — speak through the camera
 - **Push notifications** — person / impact alerts
-- **Cloud event clips** — protected moments auto-uploaded
+- **Cloud event clips** — protected moments auto-uploaded to **Google Drive** (real, with Gmail sign-in)
 
 ### ✨ AI event timeline (the killer feature)
 - Live chronological feed with **AI-written descriptions**
@@ -169,8 +169,47 @@ Settings persist in `localStorage` (with an in-memory fallback for sandboxed pre
 | Loop recording | Simulated counter | ✅ real `MediaRecorder`, **persisted to OPFS** |
 | Storage meter | Simulated | ✅ real `navigator.storage.estimate()` usage/quota |
 | License-plate capture | Simulated plate strings | ⚠️ needs on-device OCR (see roadmap) |
-| Cloud upload / push | Simulated status changes | ⚠️ needs a backend (GitHub Pages is static) |
+| Cloud upload | Simulated until you connect Drive | ✅ **real Google Drive upload** (needs your OAuth Client ID) |
+| Push notifications | Browser notifications only | ⚠️ true push needs a backend (FCM/APNs) |
 | True background parking mode | n/a | ⚠️ needs a native wrapper |
+
+---
+
+## ☁️ Google Drive cloud (Gmail sign-in)
+
+Protected clips, impact events and snapshots upload to a **“Smart Dash Cam” folder in your
+Google Drive**. It's fully client-side OAuth (authorization-code + PKCE via Google Identity
+Services) — **no backend needed**, so it works on GitHub Pages.
+
+### One-time setup (~5 minutes)
+
+1. Go to **https://console.cloud.google.com/** and create a project (e.g. `smart-dash-cam`).
+2. **APIs & Services → Library** → search **Google Drive API** → **Enable**.
+3. **APIs & Services → OAuth consent screen**:
+   - User type: **External**
+   - App name `Smart Dash Cam`, add your support & developer email.
+   - **Scopes:** add `.../auth/drive.file` (non-sensitive — “create & delete only the files
+     this app creates”).
+   - **Test users:** add your Gmail. Leave the app in **Testing** (fine for personal use, up
+     to 100 test users).
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID → Web application**:
+   - **Authorized JavaScript origins:** `https://successpartner10.github.io`
+   - Create, then copy the **Client ID** (looks like `xxxx.apps.googleusercontent.com`).
+5. Open the app → **Settings → Cloud → Google Drive** → paste the Client ID → **Save** → tap
+   **🔑 Sign in**.
+
+Now protected clips upload for real. The **Cloud event clips** panel lists your Drive files
+with real sizes/timestamps and a **⬇ download** button. Sign out anytime (it revokes the token).
+
+### Notes
+
+- The Client ID is stored **only in your browser** (`localStorage`); nothing is sent to any
+  server but Google.
+- Drive access uses the `drive.file` scope — the app can only see/create files it made.
+- The sandboxed in-app preview can't reach Google (its origin isn't authorized); use the
+  GitHub Pages URL for the real sign-in.
+- The demo feed also uploads real files (JPEG event snapshots, throttled to ≤1/minute) so you
+  can test end-to-end without a camera.
 
 ---
 
