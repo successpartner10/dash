@@ -446,14 +446,15 @@ small{font-size:11.5px}
   <div class="sheet">
     <h2>👋 Smart Dash Cam</h2>
     <p>One app, two automatic modes. <b>Driving</b> (GPS · speed · loop recording · accident detection) and <b>Parking</b> (person / vehicle / impact detection · live remote video · two-way talk). And instead of 8 hours of video — an <b>AI timeline</b> that tells you what actually mattered.</p>
+    <p style="margin-bottom:10px">Live view starts from <b>your real camera</b>. If no camera is available (or it's blocked), it falls back to the demo feed automatically.</p>
     <div class="opts">
+      <button class="opt" id="welcomeCam" style="border-color:rgba(255,176,46,.45)">
+        <span class="o-ic">📷</span>
+        <span><b>Use my real camera</b> <span style="color:var(--amber);font-size:11px;font-weight:700">RECOMMENDED</span><small>Live view from your actual camera + real GPS, speed &amp; loop recording (needs HTTPS)</small></span>
+      </button>
       <button class="opt" id="welcomeDemo">
         <span class="o-ic">🎬</span>
-        <span><b>Try the demo feed</b><small>Simulated camera, GPS &amp; events — everything works instantly</small></span>
-      </button>
-      <button class="opt" id="welcomeCam">
-        <span class="o-ic">📷</span>
-        <span><b>Use my real camera</b><small>Best on a phone over HTTPS (camera + GPS + recording)</small></span>
+        <span><b>Demo feed (fallback)</b><small>Simulated camera, GPS &amp; events — used only when a camera isn't available</small></span>
       </button>
     </div>
   </div>
@@ -1101,18 +1102,31 @@ function bind(){
   $('#welcomeCam').addEventListener('click',()=>{start(false);});
 }
 function syncSetting(k){try{store.setItem('sdc_settings',JSON.stringify(settings));}catch(_){}}
-function start(useDemo){
+async function start(useDemo){
   $('#welcome').style.display='none';
-  if(useDemo){useDemoFeed();} else {enableCamera();}
   S.mode='driving'; setMode('driving');
-  if(settings.autoStart&&S.feed==='demo'){S.recording=true;addEvent('system','Loop recording ON','Auto-start: recording began when power was applied.');}
+  // start rendering immediately (demo scene shows while camera permission resolves)
   requestAnimationFrame(frame);
   setInterval(()=>updateHUD(),1000);
+  if(useDemo){
+    useDemoFeed();
+  } else {
+    await enableCamera(); // falls back to demo automatically if unavailable/blocked
+  }
+  // auto-start recording
+  if(settings.autoStart && !S.recording){
+    if(S.feed==='camera'){
+      try{ startRealRecorder(); addEvent('system','Loop recording ON (real)','Auto-start: recording began when power was applied.'); }
+      catch(_){ S.recording=true; }
+    } else {
+      S.recording=true; addEvent('system','Loop recording ON','Auto-start: recording began when power was applied.');
+    }
+  }
 }
 
-/* boot */
+/* boot — real camera first, demo only as fallback */
 bind(); buildZones(); updateHUD(); renderClips(); renderDigest(); updateStats();
-try{ if(store.getItem('sdc_seen')){ $('#welcome').style.display='none'; start(true);} else { $('#welcome').style.display='grid'; } }
+try{ if(store.getItem('sdc_seen')){ $('#welcome').style.display='none'; start(false);} else { $('#welcome').style.display='grid'; } }
 catch(_){ $('#welcome').style.display='grid'; }
 function updateStats(){ $('#statEvents').textContent=events.length; }
 

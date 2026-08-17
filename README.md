@@ -51,12 +51,10 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 ## ▶️ How to use
 
 1. Open **https://successpartner10.github.io/dash/** (best on a phone).
-2. Pick a feed:
-   - 🎬 **Demo feed** — simulated camera, GPS, speed and a scripted scenario
-     (person approaches & lingers → vehicle passes & plate captured → impact → person leaves).
-     Everything works instantly.
-   - 📷 **Use my real camera** — your actual camera, real GPS + speed, real frame-diff
-     motion detection, and real loop recording (`MediaRecorder`).
+2. **Live view starts from your real camera.** Tap **"Use my real camera"** (or it auto-starts
+   on return visits) for the actual camera, real GPS + speed, real frame-diff motion detection,
+   and real loop recording (`MediaRecorder`). If no camera is available — or it's blocked
+   (e.g. the sandboxed preview) — the app automatically falls back to the 🎬 **demo feed**.
 3. Toggle **Driving / Parking** modes from the top bar.
 4. Watch the **AI timeline** fill up instead of watching 8 hours of video.
 
