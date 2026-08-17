@@ -296,7 +296,7 @@ input[type=text]:focus{border-color:#3a4b5e;outline:none}
           <div class="hud" id="hud">
             <div class="row tl">
               <div class="mode-badge driving" id="modeBadge">● DRIVING</div>
-              <div class="badge"><span class="k">CAM</span><span class="v" id="camLabel">FRONT</span></div>
+              <div class="badge"><span class="k">CAM</span><span class="v" id="camLabel">REAR</span></div>
             </div>
             <div class="row tr" style="flex-direction:column;align-items:flex-end">
               <div class="badge"><span class="k">TIME</span><span class="v" id="clock">--:--:--</span></div>
@@ -343,7 +343,7 @@ input[type=text]:focus{border-color:#3a4b5e;outline:none}
           <!-- controls -->
           <div class="cam-controls" id="camControls">
             <button id="btnRec" class="rec" title="Toggle loop recording">⏺ REC</button>
-            <button id="btnCam" title="Switch front/rear">🔄 <span id="btnCamTxt">FRONT</span></button>
+            <button id="btnCam" title="Switch front/rear">🔄 <span id="btnCamTxt">REAR</span></button>
             <button id="btnSnap" title="Snapshot">📸</button>
             <button id="btnProtect" title="Protect current footage">🛡️ Protect</button>
             <button id="btnZones" title="Motion zones" style="display:none">🔲 Zones</button>
@@ -487,7 +487,7 @@ input[type=text]:focus{border-color:#3a4b5e;outline:none}
     <div class="opts">
       <button class="opt" id="welcomeCam" style="border-color:rgba(255,176,46,.45)">
         <span class="o-ic">📷</span>
-        <span><b>Use my real camera</b> <span style="color:var(--amber);font-size:11px;font-weight:700">RECOMMENDED</span><small>Live view from your actual camera + real GPS, speed &amp; loop recording (needs HTTPS)</small></span>
+        <span><b>Use my real camera</b> <span style="color:var(--amber);font-size:11px;font-weight:700">RECOMMENDED</span><small>Live view from your <b>rear (road-facing)</b> camera + real GPS, speed &amp; loop recording (needs HTTPS)</small></span>
       </button>
       <button class="opt" id="welcomeDemo">
         <span class="o-ic">🎬</span>
@@ -516,7 +516,7 @@ const S={
   mode:'driving',
   feed:'demo',              // 'demo' | 'camera'
   recording:false,
-  cam:'front',
+  cam:'rear',
   lowPower:false,
   zonesOn:true,
   zones:Array(9).fill(true),

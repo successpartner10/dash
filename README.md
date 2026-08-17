@@ -82,10 +82,11 @@ Notes:
 ## ▶️ How to use
 
 1. Open **https://successpartner10.github.io/dash/** (best on a phone).
-2. **Live view starts from your real camera.** Tap **"Use my real camera"** (or it auto-starts
-   on return visits) for the actual camera, real GPS + speed, real frame-diff motion detection,
-   and real loop recording. If no camera is available — or it's blocked (e.g. a sandboxed
-   preview) — it automatically falls back to the 🎬 **demo feed**.
+2. **Live view starts from your real camera — rear (road-facing) by default.** Tap **"Use my real
+   camera"** (or it auto-starts on return visits) for the actual camera, real GPS + speed, real
+   frame-diff motion detection, and real loop recording. Use the **🔄 FRONT/REAR** button to
+   switch to the selfie camera if needed. If no camera is available — or it's blocked (e.g. a
+   sandboxed preview) — it automatically falls back to the 🎬 **demo feed**.
 3. Tap **📲 Install** to add it to your home screen as a real app.
 4. Toggle **Driving / Parking** modes from the top bar.
 5. Watch the **AI timeline** fill up instead of watching 8 hours of video.
