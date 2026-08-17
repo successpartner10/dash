@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e13">
+<title>Smart Dash Cam</title>
+<meta name="description" content="Smart Dash Cam — one app, two automatic modes: driving (GPS, speed, loop recording, accident detection) and parking (person/vehicle/impact detection, live remote video, two-way talk), with an AI event timeline.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23ffb02e'/><rect x='20' y='34' width='52' height='38' rx='8' fill='white'/><rect x='68' y='44' width='16' height='16' rx='4' fill='white'/><circle cx='38' cy='53' r='6' fill='%23ffb02e'/></svg>">
+<style>
+:root{
+  --bg:#0a0e13; --panel:#121820; --panel2:#1a222c; --line:#232e3a;
+  --text:#e8eef4; --muted:#8a9aab; --faint:#5a6a7a;
+  --amber:#ffb02e; --teal:#2fd6c0; --red:#ff4d5e; --blue:#4d9fff; --green:#3ddc84;
+  --mono:'SF Mono',ui-monospace,'Cascadia Mono',Consolas,'Roboto Mono',monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:
+    radial-gradient(1200px 600px at 70% -10%, #16202c 0%, transparent 60%),
+    var(--bg);
+  color:var(--text);
+  font:14px/1.45 -apple-system,'Segoe UI',Roboto,Inter,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+#app{max-width:1380px;margin:0 auto;padding:14px 16px 40px}
+/* ---------- top bar ---------- */
+.topbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:.2px}
+.brand .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--amber),#ff7a2e);
+  display:grid;place-items:center;box-shadow:0 4px 18px rgba(255,176,46,.35)}
+.brand .chip{font-size:10px;font-weight:800;letter-spacing:1px;padding:2px 7px;border-radius:20px;
+  background:rgba(47,214,192,.14);color:var(--teal);border:1px solid rgba(47,214,192,.35);text-transform:uppercase}
+.mode-toggle{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px;margin-left:auto}
+.mode-toggle button{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:600;padding:8px 16px;
+  border-radius:9px;cursor:pointer;display:flex;gap:7px;align-items:center;transition:.15s}
+.mode-toggle button.active{background:linear-gradient(135deg,#2a3542,#1c2632);color:var(--text);box-shadow:0 2px 10px rgba(0,0,0,.4)}
+.mode-toggle button[data-mode="driving"].active{color:var(--amber)}
+.mode-toggle button[data-mode="parking"].active{color:var(--teal)}
+.top-status{display:flex;align-items:center;gap:9px}
+.pill{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 11px;border-radius:20px;
+  background:var(--panel);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint);display:inline-block}
+.dot.live{background:var(--red);box-shadow:0 0 0 0 rgba(255,77,94,.6);animation:pulse 1.6s infinite}
+.dot.rec{background:var(--red);animation:pulse 1s infinite}
+.dot.ok{background:var(--green)}
+.dot.amber{background:var(--amber)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,77,94,.55)}70%{box-shadow:0 0 0 7px rgba(255,77,94,0)}100%{box-shadow:0 0 0 0 rgba(255,77,94,0)}}
+.icon-btn{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:10px;padding:7px 10px;
+  cursor:pointer;font:inherit;transition:.15s}
+.icon-btn:hover{color:var(--text);border-color:#334150}
+/* ---------- tabs ---------- */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.tabs button{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:600;padding:9px 16px;
+  cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s}
+.tabs button.active{color:var(--text);border-bottom-color:var(--amber)}
+/* ---------- layout ---------- */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:14px}
+.col-feed{display:flex;flex-direction:column;gap:12px;min-width:0}
+.col-events{display:flex;flex-direction:column;gap:12px;min-width:0}
+@media(max-width:1020px){.grid{grid-template-columns:1fr}}
+/* ---------- camera ---------- */
+.camera{position:relative;background:#000;border:1px solid var(--line);border-radius:16px;overflow:hidden;
+  aspect-ratio:16/9;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+#feed,#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 100% at 50% 45%,transparent 55%,rgba(0,0,0,.55) 100%)}
+.scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px)}
+/* HUD */
+.hud{position:absolute;inset:0;pointer-events:none;font-family:var(--mono);font-size:12px}
+.hud .row{position:absolute;display:flex;gap:8px;align-items:flex-start}
+.hud .tl{top:10px;left:12px}.hud .tr{top:10px;right:12px}.hud .bl{bottom:12px;left:12px}.hud .br{bottom:12px;right:12px}
+.hud .badge{background:rgba(8,12,16,.72);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(4px);
+  border-radius:8px;padding:5px 9px;display:flex;flex-direction:column;gap:1px;line-height:1.2}
+.hud .badge .k{font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+.hud .badge .v{font-size:13px;color:#fff;font-weight:600}
+.hud .mode-badge{background:rgba(8,12,16,.72);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px 10px;
+  font-weight:800;letter-spacing:1.5px;font-size:11px;display:flex;align-items:center;gap:7px}
+.hud .mode-badge.driving{color:var(--amber)}
+.hud .mode-badge.parking{color:var(--teal)}
+.hud .speed{font-size:30px;font-weight:800;color:#fff;line-height:1;display:flex;align-items:baseline;gap:4px}
+.hud .speed small{font-size:12px;color:var(--muted);font-weight:600}
+.hud .rec-badge{display:none;align-items:center;gap:6px;color:var(--red);font-weight:700}
+.hud .rec-badge.on{display:flex}
+.eq{display:flex;gap:2px;align-items:flex-end;height:14px}
+.eq i{width:3px;background:var(--teal);border-radius:1px;animation:eq 0.9s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.15s}.eq i:nth-child(3){animation-delay:.3s}.eq i:nth-child(4){animation-delay:.45s}.eq i:nth-child(5){animation-delay:.6s}
+@keyframes eq{0%,100%{height:3px}50%{height:14px}}
+/* detection boxes */
+.box{position:absolute;border:2px solid;border-radius:5px;transition:all .12s linear;pointer-events:none}
+.box .tag{position:absolute;top:-22px;left:-2px;font:600 11px var(--mono);color:#fff;padding:2px 6px;border-radius:5px;white-space:nowrap}
+.box .tag .conf{opacity:.8;font-weight:400;margin-left:4px}
+.box.person{border-color:var(--amber);box-shadow:0 0 14px rgba(255,176,46,.35)}
+.box.person .tag{background:rgba(255,176,46,.9)}
+.box.vehicle{border-color:var(--teal);box-shadow:0 0 14px rgba(47,214,192,.3)}
+.box.vehicle .tag{background:rgba(16,150,138,.95)}
+.box.impact{border-color:var(--red);box-shadow:0 0 20px rgba(255,77,94,.6)}
+.box.impact .tag{background:rgba(255,77,94,.95)}
+.plate-chip{position:absolute;bottom:-24px;left:-2px;background:#10161e;color:var(--amber);border:1px solid var(--amber);
+  font:700 11px var(--mono);padding:2px 6px;border-radius:4px;letter-spacing:2px}
+/* motion zones */
+.zones{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);pointer-events:none}
+.zone{pointer-events:auto;border:1px dashed rgba(255,255,255,.14);display:none;position:relative}
+.zones.on .zone{display:block}
+.zone .zl{position:absolute;top:4px;left:6px;font:700 9px var(--mono);color:rgba(255,255,255,.5);letter-spacing:1px}
+.zone.armed{background:rgba(47,214,192,.06)}
+.zone.armed::after{content:"ARMED";position:absolute;bottom:4px;right:6px;font:700 8px var(--mono);color:rgba(47,214,192,.7);letter-spacing:1px}
+.zone.disarmed{background:rgba(0,0,0,.25)}
+.zone.disarmed .zl{color:rgba(255,255,255,.25)}
+.zone.disarmed::after{content:"OFF";position:absolute;bottom:4px;right:6px;font:700 8px var(--mono);color:rgba(255,255,255,.3)}
+/* flash / impact */
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.lowpower-veil{position:absolute;inset:0;background:rgba(0,0,0,.82);display:none;place-items:center;z-index:5}
+.lowpower-veil.on{display:grid}
+.lowpower-veil .inner{text-align:center;color:var(--muted);font-family:var(--mono)}
+.lowpower-veil .inner b{display:block;font-size:16px;color:var(--text);margin-bottom:4px}
+.lowpower-veil .moon{font-size:34px;display:block;margin-bottom:8px;animation:bob 3s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+/* camera controls */
+.cam-controls{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:6}
+.cam-controls button{background:rgba(10,14,19,.78);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:12px;
+  padding:9px 14px;cursor:pointer;font:600 13px/1 inherit;backdrop-filter:blur(5px);display:flex;align-items:center;gap:7px;transition:.15s}
+.cam-controls button:hover{background:rgba(24,32,42,.9)}
+.cam-controls button.rec{color:var(--red)}
+.cam-controls button.rec.on{background:var(--red);color:#fff;border-color:var(--red)}
+.cam-controls button:active{transform:scale(.96)}
+.cam-controls .talk{color:var(--teal)}
+.cam-controls .talk.holding{background:var(--teal);color:#06201c;border-color:var(--teal)}
+/* ---------- cards ---------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.card h3{margin:0 0 10px;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:700;display:flex;align-items:center;gap:8px}
+.card h3 .spacer{margin-left:auto}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:640px){.stats-row{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.stat .k{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:4px}
+.stat .v{font:700 20px/1 var(--mono);color:var(--text)}
+.stat .v small{font:600 11px var(--mono);color:var(--muted)}
+.bar{height:6px;border-radius:4px;background:#0c1218;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--green),var(--teal));transition:width .5s}
+.bar i.warn{background:linear-gradient(90deg,var(--amber),#ff7a2e)}
+/* digest */
+.digest{background:linear-gradient(135deg,#171f2b,#121820);border:1px solid #2b3a4b}
+.digest .ai{display:flex;gap:10px;align-items:flex-start}
+.digest .spark{width:34px;height:34px;flex:none;border-radius:9px;display:grid;place-items:center;font-size:17px;
+  background:linear-gradient(135deg,var(--amber),#ff7a2e);box-shadow:0 4px 16px rgba(255,176,46,.3)}
+.digest p{margin:0;color:#cdd9e4;font-size:13px}
+.digest .counts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.digest .counts span{font:600 11px var(--mono);padding:3px 8px;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted)}
+/* event feed */
+.events{overflow-y:auto;max-height:460px;padding:6px 6px 6px 0}
+.ev{display:flex;gap:11px;padding:10px 8px;border-radius:10px;border:1px solid transparent;cursor:pointer;transition:.12s}
+.ev:hover{background:rgba(255,255,255,.03);border-color:var(--line)}
+.ev .ic{width:34px;height:34px;flex:none;border-radius:9px;display:grid;place-items:center;font-size:16px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.ev.critical .ic{background:rgba(255,77,94,.14);border-color:rgba(255,77,94,.4)}
+.ev.warning .ic{background:rgba(255,176,46,.12);border-color:rgba(255,176,46,.35)}
+.ev .bd{min-width:0;flex:1}
+.ev .tt{font-weight:600;font-size:13px;display:flex;justify-content:space-between;gap:8px}
+.ev .tt .time{font:600 11px var(--mono);color:var(--faint);flex:none}
+.ev .ds{color:var(--muted);font-size:12.5px;margin-top:2px}
+.ev .meta{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.ev .meta span{font:600 10px var(--mono);padding:2px 7px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
+.ev .meta span.sev-crit{color:var(--red);border-color:rgba(255,77,94,.4)}
+.ev .meta span.sev-warn{color:var(--amber);border-color:rgba(255,176,46,.4)}
+.ev .meta span.sev-ok{color:var(--teal);border-color:rgba(47,214,192,.4)}
+.ev .clipthumb{width:58px;height:34px;flex:none;border-radius:6px;border:1px solid var(--line);object-fit:cover;margin-top:2px}
+/* clips */
+.clip{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.clip:last-child{border-bottom:0}
+.clip .ci{font-size:16px}
+.clip .cb{flex:1;min-width:0}
+.clip .ct{font-size:12.5px;font-weight:600}
+.clip .cs{font:500 11px var(--mono);color:var(--muted)}
+.clip .st{font:700 10px var(--mono);padding:3px 8px;border-radius:6px;flex:none}
+.st.synced{color:var(--green);background:rgba(61,220,132,.1);border:1px solid rgba(61,220,132,.35)}
+.st.up{color:var(--amber);background:rgba(255,176,46,.1);border:1px solid rgba(255,176,46,.35)}
+.st.local{color:var(--blue);background:rgba(77,159,255,.1);border:1px solid rgba(77,159,255,.35)}
+/* timeline view */
+.hidden{display:none!important}
+.tl-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.tl-head .filter{display:flex;gap:6px;flex-wrap:wrap}
+.tl-head .filter button{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:20px;padding:6px 13px;cursor:pointer;font:600 12px inherit;transition:.15s}
+.tl-head .filter button.active{background:var(--panel2);color:var(--text);border-color:#334150}
+.timeline{position:relative;padding-left:26px}
+.timeline::before{content:"";position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:var(--line)}
+.tl-item{position:relative;padding:4px 0 16px}
+.tl-item::before{content:"";position:absolute;left:-23px;top:10px;width:12px;height:12px;border-radius:50%;background:var(--panel);border:2px solid var(--muted)}
+.tl-item.critical::before{border-color:var(--red);background:var(--red)}
+.tl-item.warning::before{border-color:var(--amber);background:var(--amber)}
+.tl-item .tg{font:600 11px var(--mono);color:var(--faint);margin-bottom:3px}
+/* settings */
+.settings{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.set-group{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.set-group h3{margin:0 0 12px;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.set-row:last-child{border-bottom:0}
+.set-row .lb{font-size:13px;font-weight:500}
+.set-row .lb small{display:block;color:var(--muted);font-size:11.5px;font-weight:400;margin-top:1px}
+.switch{position:relative;width:42px;height:24px;flex:none;cursor:pointer}
+.switch input{opacity:0;width:0;height:0}
+.switch .tr{position:absolute;inset:0;background:#1c2632;border:1px solid var(--line);border-radius:20px;transition:.2s}
+.switch .tr::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#5a6a7a;transition:.2s}
+.switch input:checked + .tr{background:rgba(47,214,192,.25);border-color:var(--teal)}
+.switch input:checked + .tr::after{transform:translateX(18px);background:var(--teal)}
+select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit}
+/* toasts */
+#toasts{position:fixed;top:16px;right:16px;z-index:100;display:flex;flex-direction:column;gap:8px;max-width:340px}
+.toast{background:#141c26;border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:10px;padding:10px 14px;
+  box-shadow:0 8px 30px rgba(0,0,0,.5);font-size:13px;animation:tin .25s ease;display:flex;gap:9px;align-items:flex-start}
+.toast.crit{border-left-color:var(--red)}
+.toast.ok{border-left-color:var(--teal)}
+@keyframes tin{from{transform:translateX(20px);opacity:0}to{transform:none;opacity:1}}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(4,7,10,.72);backdrop-filter:blur(6px);display:grid;place-items:center;z-index:200;padding:20px}
+.modal .sheet{background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:520px;width:100%;padding:26px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.modal h2{margin:0 0 6px;font-size:21px}
+.modal p{color:var(--muted);margin:0 0 18px;font-size:14px}
+.modal .opts{display:grid;gap:10px}
+.modal .opt{display:flex;gap:12px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+  padding:14px;cursor:pointer;text-align:left;transition:.15s;color:var(--text);font:inherit}
+.modal .opt:hover{border-color:#3a4b5e}
+.modal .opt .o-ic{font-size:24px}
+.modal .opt b{display:block;font-size:14px}
+.modal .opt small{color:var(--muted)}
+.muted{color:var(--muted)}
+small{font-size:11.5px}
+.footnote{color:var(--faint);font-size:12px;margin-top:14px;line-height:1.5}
+.btn{border:0;border-radius:10px;padding:10px 16px;font:600 13px inherit;cursor:pointer;background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+.btn.primary{background:linear-gradient(135deg,var(--amber),#ff7a2e);color:#1a1205;border:0}
+.btn.danger{color:var(--red);border-color:rgba(255,77,94,.4)}
+.btn:hover{filter:brightness(1.08)}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== TOP BAR ===================== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="8" width="14" height="10" rx="2.5" fill="#fff"/><rect x="17" y="11" width="4" height="4" rx="1.2" fill="#fff" opacity=".85"/><circle cx="8.6" cy="13" r="1.5" fill="#ffb02e"/></svg>
+      </div>
+      <span>Smart Dash Cam</span>
+      <span class="chip">AI</span>
+    </div>
+
+    <div class="mode-toggle" id="modeToggle">
+      <button data-mode="driving">🚗 Driving</button>
+      <button data-mode="parking">🅿️ Parking</button>
+    </div>
+
+    <div class="top-status">
+      <span class="pill"><span class="dot live" id="liveDot"></span><span id="liveTxt">LIVE</span></span>
+      <span class="pill" id="recPill" style="display:none"><span class="dot rec"></span><span id="recTxt">REC 00:00</span></span>
+      <span class="pill">💾 <span id="storeTxt">12.4 GB</span></span>
+      <button class="icon-btn" id="lowPowerBtn" title="Low-power mode">🌙</button>
+      <button class="icon-btn" id="settingsBtn" title="Settings">⚙️</button>
+    </div>
+  </header>
+
+  <!-- ===================== TABS ===================== -->
+  <nav class="tabs" id="tabs">
+    <button data-view="live" class="active">📹 Live view</button>
+    <button data-view="timeline">🕒 AI timeline</button>
+    <button data-view="settings">⚙️ Settings</button>
+  </nav>
+
+  <main>
+  <!-- ===================== LIVE VIEW ===================== -->
+  <section id="view-live" class="view">
+    <div class="grid">
+      <div class="col-feed">
+        <div class="camera" id="camera">
+          <canvas id="feed" width="960" height="540"></canvas>
+          <video id="video" playsinline autoplay muted style="display:none"></video>
+          <div class="scan"></div>
+          <div class="vignette"></div>
+
+          <!-- HUD -->
+          <div class="hud" id="hud">
+            <div class="row tl">
+              <div class="mode-badge driving" id="modeBadge">● DRIVING</div>
+              <div class="badge"><span class="k">CAM</span><span class="v" id="camLabel">FRONT</span></div>
+            </div>
+            <div class="row tr" style="flex-direction:column;align-items:flex-end">
+              <div class="badge"><span class="k">TIME</span><span class="v" id="clock">--:--:--</span></div>
+              <div class="badge" id="recBadgeWrap" style="display:none">
+                <span class="rec-badge on"><span class="dot rec"></span><span id="recBadge">REC ●</span></span>
+              </div>
+            </div>
+            <div class="row bl" style="flex-direction:column">
+              <div class="badge" id="speedBadge">
+                <div class="speed"><span id="speedVal">0</span><small>km/h</small></div>
+                <span class="k" style="margin-top:3px">🛰️ <span id="gpsVal">43.65320, -79.38320</span> · <span id="satVal">LOCK 8</span></span>
+              </div>
+              <div class="badge" id="parkBadge" style="display:none">
+                <span class="k">DETECTION</span>
+                <span class="v" id="detectVal">person · vehicle · impact</span>
+              </div>
+            </div>
+            <div class="row br" style="flex-direction:column;align-items:flex-end">
+              <div class="badge" id="talkBadge" style="display:none">
+                <span class="k">LIVE AUDIO</span>
+                <span style="display:flex;align-items:center;gap:6px"><span class="eq"><i></i><i></i><i></i><i></i><i></i></span><span style="color:var(--teal);font-weight:700;font-size:10px">TALK</span></span>
+              </div>
+              <div class="badge">
+                <span class="k">STORAGE</span>
+                <div style="width:90px"><div class="bar" style="margin-top:3px"><i id="miniBar" style="width:20%"></i></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- detection boxes + zones -->
+          <div class="zones" id="zones"></div>
+          <div id="boxes" style="position:absolute;inset:0;pointer-events:none"></div>
+
+          <div class="lowpower-veil" id="lpVeil">
+            <div class="inner">
+              <span class="moon">🌙</span>
+              <b>LOW-POWER MONITORING</b>
+              Display off · sensors armed<br>Impact &amp; motion still detected
+            </div>
+          </div>
+
+          <div id="flash"></div>
+
+          <!-- controls -->
+          <div class="cam-controls" id="camControls">
+            <button id="btnRec" class="rec" title="Toggle loop recording">⏺ REC</button>
+            <button id="btnCam" title="Switch front/rear">🔄 <span id="btnCamTxt">FRONT</span></button>
+            <button id="btnSnap" title="Snapshot">📸</button>
+            <button id="btnProtect" title="Protect current footage">🛡️ Protect</button>
+            <button id="btnZones" title="Motion zones" style="display:none">🔲 Zones</button>
+            <button id="btnTalk" class="talk" title="Two-way talk" style="display:none">🎤 Talk</button>
+          </div>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat"><div class="k">Speed (GPS)</div><div class="v"><span id="statSpeed">0</span> <small>km/h</small></div></div>
+          <div class="stat"><div class="k">Trip time</div><div class="v" id="statUptime">00:00</div></div>
+          <div class="stat"><div class="k">Events</div><div class="v" id="statEvents">0</div></div>
+          <div class="stat"><div class="k">Storage</div><div class="v"><span id="statStore">12.4</span> <small>/ 64 GB</small><div class="bar"><i id="statBar"></i></div></div>
+        </div>
+      </div>
+
+      <div class="col-events">
+        <div class="card digest">
+          <div class="ai">
+            <div class="spark">✨</div>
+            <div>
+              <h3 style="margin:0 0 4px">AI — what actually matters</h3>
+              <p id="digestTxt">Watching. I'll summarize the moment anything happens.</p>
+            </div>
+          </div>
+          <div class="counts" id="digestCounts"></div>
+        </div>
+
+        <div class="card">
+          <h3>Live event feed <span class="spacer">🔔</span></h3>
+          <div class="events" id="eventFeed"></div>
+        </div>
+
+        <div class="card">
+          <h3>Cloud event clips <span class="spacer">☁️</span></h3>
+          <div id="clipList"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TIMELINE VIEW ===================== -->
+  <section id="view-timeline" class="view hidden">
+    <div class="card">
+      <div class="tl-head">
+        <h3 style="margin:0">Full event timeline</h3>
+        <div class="filter" id="tlFilter">
+          <button data-f="all" class="active">All</button>
+          <button data-f="person">🚶 People</button>
+          <button data-f="vehicle">🚗 Vehicles</button>
+          <button data-f="impact">💥 Impacts</button>
+          <button data-f="system">⚙️ System</button>
+        </div>
+        <span class="spacer"></span>
+        <button class="btn" id="exportBtn">⬇ Copy text</button>
+        <button class="btn danger" id="clearBtn">Clear</button>
+      </div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+  </section>
+
+  <!-- ===================== SETTINGS VIEW ===================== -->
+  <section id="view-settings" class="view hidden">
+    <div class="settings">
+      <div class="set-group">
+        <h3>Driving mode</h3>
+        <label class="set-row"><span class="lb">Auto-start on power<small>Begin recording when power is applied</small></span><span class="switch"><input type="checkbox" data-set="autoStart" checked><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Loop recording<small>Segment length</small></span>
+          <select data-set="loopLen"><option>1 min</option><option selected>3 min</option><option>5 min</option></select></label>
+        <label class="set-row"><span class="lb">Video quality<small>Front / rear</small></span>
+          <select data-set="quality"><option>720p HD</option><option selected>1080p FHD</option><option>1440p QHD</option></select></label>
+        <label class="set-row"><span class="lb">G-sensor sensitivity<small>Impact detection threshold</small></span>
+          <select data-set="gSense"><option>Low</option><option selected>Medium</option><option>High</option></select></label>
+        <label class="set-row"><span class="lb">Protect on harsh braking<small>Auto-lock clip when braking hard</small></span><span class="switch"><input type="checkbox" data-set="protectBrake" checked><span class="tr"></span></span></label>
+      </div>
+
+      <div class="set-group">
+        <h3>Parking mode</h3>
+        <label class="set-row"><span class="lb">Person detection<small>AI person recognition</small></span><span class="switch"><input type="checkbox" data-set="detPerson" checked><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Vehicle detection<small>AI vehicle recognition</small></span><span class="switch"><input type="checkbox" data-set="detVehicle" checked><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Impact detection<small>Accelerometer-based</small></span><span class="switch"><input type="checkbox" data-set="detImpact" checked><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Motion zones<small>Only monitor armed zones</small></span><span class="switch"><input type="checkbox" data-set="zonesOn" checked><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">License-plate capture<small>Auto-capture on vehicle events</small></span><span class="switch"><input type="checkbox" data-set="plateCap" checked><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Two-way talk<small>Speak through the camera</small></span><span class="switch"><input type="checkbox" data-set="twoWay" checked><span class="tr"></span></span></label>
+      </div>
+
+      <div class="set-group">
+        <h3>Cloud &amp; alerts</h3>
+        <label class="set-row"><span class="lb">Upload event clips<small>Auto-upload protected clips</small></span><span class="switch"><input type="checkbox" data-set="cloudUpload" checked><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Push notifications<small>Alert me on person/impact</small></span><span class="switch"><input type="checkbox" data-set="notify" checked><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Live remote video<small>Stream view from anywhere</small></span><span class="switch"><input type="checkbox" data-set="remoteVideo" checked><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Low-power mode<small>Screen off, sensors armed</small></span><span class="switch"><input type="checkbox" data-set="lowPower"><span class="tr"></span></span></label>
+      </div>
+
+      <div class="set-group">
+        <h3>Feed &amp; camera</h3>
+        <div class="set-row"><span class="lb">Camera source<small>Demo simulates a live dashcam</small></span>
+          <div style="display:flex;gap:6px">
+            <button class="btn" id="useCameraBtn">📷 Use my camera</button>
+            <button class="btn" id="useDemoBtn">🎬 Demo feed</button>
+          </div>
+        </div>
+        <div class="set-row"><span class="lb">Notifications permission<small>Browser alerts (when allowed)</small></span>
+          <button class="btn" id="notifPermBtn">Enable</button>
+        </div>
+      </div>
+    </div>
+    <p class="footnote">Prototype note: this is a fully interactive web prototype of the combined dashcam. In “demo feed” mode the camera, GPS, speed and events are simulated so you can experience the product. On a phone over HTTPS, “Use my camera” drives the real camera, GPS and a real loop-recording MediaRecorder. Wrap it with Capacitor to ship a native app; swap the simulation for real ML models (e.g. YOLO on device) for production.</p>
+  </section>
+  </main>
+</div>
+
+<div id="toasts"></div>
+
+<!-- first-run modal -->
+<div class="modal" id="welcome" style="display:none">
+  <div class="sheet">
+    <h2>👋 Smart Dash Cam</h2>
+    <p>One app, two automatic modes. <b>Driving</b> (GPS · speed · loop recording · accident detection) and <b>Parking</b> (person / vehicle / impact detection · live remote video · two-way talk). And instead of 8 hours of video — an <b>AI timeline</b> that tells you what actually mattered.</p>
+    <div class="opts">
+      <button class="opt" id="welcomeDemo">
+        <span class="o-ic">🎬</span>
+        <span><b>Try the demo feed</b><small>Simulated camera, GPS &amp; events — everything works instantly</small></span>
+      </button>
+      <button class="opt" id="welcomeCam">
+        <span class="o-ic">📷</span>
+        <span><b>Use my real camera</b><small>Best on a phone over HTTPS (camera + GPS + recording)</small></span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   Smart Dash Cam — self-contained prototype
+   ============================================================ */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const pad=n=>String(n).padStart(2,'0');
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+
+/* safe storage (sandboxed iframes block localStorage) */
+const store=(()=>{try{const t='__t';localStorage.setItem(t,'1');localStorage.removeItem(t);return localStorage;}catch(e){const m={};return{getItem:k=>(k in m?m[k]:null),setItem:(k,v)=>{m[k]=String(v);},removeItem:k=>{delete m[k];}};}})();
+
+/* ---------- state ---------- */
+const W=960,H=540;
+const S={
+  mode:'driving',
+  feed:'demo',              // 'demo' | 'camera'
+  recording:false,
+  cam:'front',
+  lowPower:false,
+  zonesOn:true,
+  zones:Array(9).fill(true),
+  speed:0, targetSpeed:45,
+  gps:{lat:43.65320,lng:-79.38320,lock:true},
+  storage:{total:64,used:12.4},
+  uptime:0,
+  scenario:{t:0,idx:0},
+  impactT:0,
+  flashT:0,
+  talk:false, micOn:false,
+  lastMotionEvent:0,
+  stream:null, rec:null, chunks:[], segments:[], protectedClips:[], protectNext:false,
+};
+const settings=Object.assign({
+  autoStart:true, loopLen:'3 min', quality:'1080p FHD', gSense:'Medium', protectBrake:true,
+  detPerson:true, detVehicle:true, detImpact:true, plateCap:true, twoWay:true,
+  cloudUpload:true, notify:true, remoteVideo:true, lowPower:false,
+},(function(){try{return JSON.parse(store.getItem('sdc_settings')||'{}');}catch(e){return{};}})());
+
+let events=[];   // newest first
+let entities=[]; // demo entities
+let clips=[];
+const eventTypes={
+  person:{icon:'🚶',cls:'warning',sev:'Person'},
+  vehicle:{icon:'🚗',cls:'',sev:'Vehicle'},
+  impact:{icon:'💥',cls:'critical',sev:'Impact'},
+  system:{icon:'⚙️',cls:'',sev:'System'},
+  talk:{icon:'🎤',cls:'',sev:'Audio'},
+  snapshot:{icon:'📸',cls:'',sev:'Snapshot'},
+};
+
+/* ---------- helpers ---------- */
+function fmtTime(d){return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}
+function fmtClock(d){return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());}
+function nowStr(){return fmtTime(new Date());}
+
+function addEvent(type,title,desc,extra){
+  const e={id:Math.random().toString(36).slice(2),type,title,desc,time:nowStr(),mode:S.mode,
+    sev:eventTypes[type]&&eventTypes[type].sev,cls:eventTypes[type]&&eventTypes[type].cls,extra:extra||{}};
+  // attach snapshot of the demo feed as a clip thumbnail
+  if(S.feed==='demo'){try{e.thumb=feedCanvas.toDataURL('image/jpeg',0.5);}catch(_){}}
+  events.unshift(e);
+  if(events.length>200)events.length=200;
+  renderFeed(); renderTimeline(); updateStats();
+  notify(e);
+  // cloud clips for impactful moments
+  if(type==='impact' && settings.cloudUpload) pushClip('Protected — impact', true);
+  if(type==='impact' && settings.notify) toast('💥 Impact detected — footage protected','crit');
+  if(type==='person' && settings.notify) toast('🚶 Person detected near your vehicle');
+  return e;
+}
+function pushClip(title,fromImpact){
+  const c={id:Math.random().toString(36).slice(2),title,sizeMb:(fromImpact?rnd(14,38):rnd(8,24)).toFixed(1),
+    status:'up',ts:nowStr()};
+  clips.unshift(c); if(clips.length>6)clips.pop();
+  setTimeout(()=>{c.status='synced';renderClips();},2600+Math.random()*2000);
+  renderClips();
+}
+function renderClips(){
+  const el=$('#clipList');
+  if(!clips.length){el.innerHTML='<p class="muted" style="margin:6px 0 2px">No clips yet — protected moments will appear here.</p>';return;}
+  el.innerHTML=clips.map(c=>`<div class="clip">
+    <span class="ci">${c.status==='synced'?'☁️':c.status==='up'?'⏫':'💾'}</span>
+    <div class="cb"><div class="ct">${c.title}</div><div class="cs">${c.ts} · ${c.sizeMb} MB</div></div>
+    <span class="st ${c.status==='synced'?'synced':c.status==='up'?'up':'local'}">${c.status==='synced'?'SYNCED':c.status==='up'?'UPLOADING':'LOCAL'}</span>
+  </div>`).join('');
+}
+function toast(msg,kind){
+  const t=document.createElement('div');t.className='toast '+(kind||'');t.innerHTML=msg;
+  $('#toasts').appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .4s';setTimeout(()=>t.remove(),400);},4200);
+}
+function notify(e){
+  try{
+    if(!settings.notify)return;
+    if('Notification' in window && Notification.permission==='granted' && document.hidden){
+      new Notification('Smart Dash Cam · '+e.sev,{body:e.title});
+    }
+  }catch(_){}
+}
+
+/* ============================================================
+   SCENARIO ENGINE (demo feed)
+   ============================================================ */
+const PLATES=['CNM 4821','BRZK 793','TQWL 118','AXK 3024','PDY 660','KFZ 9182'];
+
+const PARK_LOOP=22;
+const parkTimeline=[
+  {at:3.2, run(){entities.push(makePerson()); if(settings.detPerson) addEvent('person','Person detected near vehicle','A person entered the monitored area and is approaching the driver side.');}},
+  {at:6.4, run(){const p=entities.find(e=>e.kind==='person'); if(p)p.lingerT=0; if(settings.detPerson) addEvent('person','Person beside driver\u2019s door','Person remained beside the driver\u2019s door, out of the camera\u2019s blind spot check. Watching for entry attempt.',{dur:'6 s'});}},
+  {at:11.0,run(){entities.push(makeVehicle()); if(settings.detVehicle) addEvent('vehicle','Vehicle approached your car','A vehicle drove past the parking space. Plate captured: '+(settings.plateCap?pick(PLATES):'(disabled)'),{plate:settings.plateCap?pick(PLATES):null});}},
+  {at:15.6,run(){ triggerImpact('impact detected while parked'); }},
+  {at:18.2,run(){const p=entities.find(e=>e.kind==='person'); if(p)p.leave(); if(settings.detPerson) addEvent('person','Person moved away','The person left the monitored area. No entry into the vehicle was detected.');}},
+];
+const DRIVE_LOOP=24;
+const driveTimeline=[
+  {at:1.0, run(){ if(settings.autoStart) addEvent('system','Trip started','Loop recording active · GPS locked · front + rear cameras recording.');}},
+  {at:6.0, run(){ addEvent('system','Speed event','Sustained speed above 60 km/h on highway segment. Footage tagged for review.');}},
+  {at:11.0,run(){ S.targetSpeed=8; addEvent('impact','Harsh braking detected','Rapid deceleration from '+(Math.round(S.speed))+' km/h. G-sensor triggered'+(settings.protectBrake?' — clip protected.':'.')); if(settings.protectBrake) pushClip('Protected — hard braking',false);}},
+  {at:16.0,run(){ triggerImpact('front collision detected'); }},
+];
+
+function triggerImpact(label){
+  S.impactT=0.9; S.flashT=0.35;
+  const e=addEvent('impact','Possible impact detected',label+'. Clip protected and queued for cloud upload. AI suggests reviewing the 30 s window around this event.',{protect:true});
+  entities.push({kind:'impact',t:0,update(dt){this.t+=dt;},done(){return this.t>1.4;}});
+  if(S.feed==='camera') protectSegment();
+}
+function makePerson(){
+  return{kind:'person',t:0,phase:'enter',lingerT:0,
+    x:1.18,x0:1.18,x1:0.63,
+    update(dt){this.t+=dt;
+      if(this.phase==='enter'){this.x=this.x0+(this.x1-this.x0)*Math.min(1,this.t/2.6); if(this.t>=2.6){this.phase='linger';this.lingerT=0;}}
+      else if(this.phase==='linger'){this.lingerT+=dt; if(this.lingerT>=6.2)this.phase='leave';}
+      else{this.x=this.x1-(this.x1+0.3)*Math.min(1,(this.t-8.8)/2.6);}
+    },
+    leave(){this.phase='leave';this.t=8.8;},
+    done(){return this.phase==='leave'&&this.t>12;},
+    box(){return{x:this.x,y:0.60,w:0.075,h:0.30,label:this.phase==='linger'?'PERSON · lingering':'PERSON',conf:'97%',cls:'person'};}
+  };
+}
+function makeVehicle(){
+  const col=pick(['#3b6ea5','#8a2f2f','#555c66','#6f7d3a']);
+  return{kind:'vehicle',t:0,x:0,col,plate:settings.plateCap?pick(PLATES):null,
+    update(dt){this.t+=dt;this.x=-0.3+this.t/3.4;},
+    done(){return this.t>4.2;},
+    box(){return{x:this.x+0.08,y:0.50,w:0.30,h:0.30,label:'VEHICLE',conf:'92%',cls:'vehicle',plate:this.plate};}
+  };
+}
+function updateScenario(dt){
+  S.scenario.t+=dt;
+  const timeline=S.mode==='parking'?parkTimeline:driveTimeline;
+  const loopLen=S.mode==='parking'?PARK_LOOP:DRIVE_LOOP;
+  while(S.scenario.idx<timeline.length && S.scenario.t>=timeline[S.scenario.idx].at){
+    timeline[S.scenario.idx].run(); S.scenario.idx++;
+  }
+  if(S.scenario.t>=loopLen){ S.scenario.t=0; S.scenario.idx=0; entities=entities.filter(e=>e.kind==='impact'&&e.t<1); }
+  entities=entities.filter(e=>{e.update(dt);return !e.done();});
+  if(S.impactT>0)S.impactT-=dt; if(S.flashT>0)S.flashT-=dt;
+}
+
+/* ============================================================
+   RENDERING
+   ============================================================ */
+const feedCanvas=$('#feed'), ctx=feedCanvas.getContext('2d');
+let last=performance.now();
+
+function drawBase(){ // shared sky+ground
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#8fb8e6'); g.addColorStop(0.5,'#cfe4f5'); g.addColorStop(1,'#eaf3fb');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,300);
+}
+function drawDriving(){
+  drawBase();
+  // sun
+  ctx.fillStyle='rgba(255,240,200,.9)'; ctx.beginPath(); ctx.arc(820,70,34,0,7); ctx.fill();
+  // skyline
+  ctx.fillStyle='#aebcc9';
+  for(let i=0;i<10;i++){const h=30+((i*37)%60),w=40+((i*53)%46);ctx.fillRect(40+i*95,270-h,w,h);}
+  // grass
+  const gr=ctx.createLinearGradient(0,270,0,H); gr.addColorStop(0,'#5b8a4a'); gr.addColorStop(1,'#3c6334');
+  ctx.fillStyle=gr; ctx.fillRect(0,270,W,140);
+  // trees
+  ctx.fillStyle='#3f6b37';
+  for(let i=0;i<6;i++){const x=30+i*40;ctx.beginPath();ctx.arc(x,272,16,0,7);ctx.fill();}
+  // road
+  const r=ctx.createLinearGradient(0,270,0,H); r.addColorStop(0,'#4a525c'); r.addColorStop(1,'#2b3038');
+  ctx.fillStyle=r;
+  ctx.beginPath(); ctx.moveTo(330,270); ctx.lineTo(630,270); ctx.lineTo(880,H); ctx.lineTo(80,H); ctx.closePath(); ctx.fill();
+  // edge lines
+  ctx.strokeStyle='rgba(255,255,255,.75)'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(345,270); ctx.lineTo(150,H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(615,270); ctx.lineTo(810,H); ctx.stroke();
+  // dashed center line (moves with speed)
+  ctx.strokeStyle='rgba(255,255,255,.8)'; ctx.lineWidth=4; ctx.setLineDash([34,26]);
+  const off=(S.scenario.t*(S.speed+6))%60;
+  ctx.lineDashOffset=off;
+  ctx.beginPath(); ctx.moveTo(480,270); ctx.lineTo(480,H); ctx.stroke();
+  ctx.setLineDash([]);
+  // hood (driver's perspective)
+  const hd=ctx.createLinearGradient(0,H-70,0,H); hd.addColorStop(0,'rgba(20,24,30,0)'); hd.addColorStop(1,'rgba(15,18,24,.95)');
+  ctx.fillStyle=hd; ctx.fillRect(0,H-70,W,70);
+  ctx.fillStyle='#14181f'; ctx.beginPath(); ctx.moveTo(0,H); ctx.lineTo(180,H-30); ctx.lineTo(180,H); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(W,H); ctx.lineTo(W-180,H-30); ctx.lineTo(W-180,H); ctx.closePath(); ctx.fill();
+}
+function drawParking(){
+  drawBase();
+  // hedge/wall band
+  ctx.fillStyle='#4f6b3f'; ctx.fillRect(0,255,W,26);
+  ctx.fillStyle='#43603a'; ctx.fillRect(0,278,W,8);
+  // asphalt
+  const a=ctx.createLinearGradient(0,286,0,H); a.addColorStop(0,'#3d434c'); a.addColorStop(1,'#23272e');
+  ctx.fillStyle=a; ctx.fillRect(0,286,W,H-286);
+  // parking stall lines
+  ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=3;
+  for(let i=0;i<4;i++){const x=170+i*200; ctx.beginPath(); ctx.moveTo(x,286); ctx.lineTo(x,H-60); ctx.stroke();}
+  // parked cars (front views)
+  const cols=['#6d7a8a','#8a2f2f','#3b6ea5','#3a4a3a'];
+  [250,450,650,850].forEach((x,i)=>{
+    ctx.fillStyle=cols[i%4]; roundRect(ctx,x,330,120,120,10); ctx.fill();
+    ctx.fillStyle='#1a212b'; roundRect(ctx,x+22,342,76,44,6); ctx.fill(); // windshield
+    ctx.fillStyle='#cbd5e0'; ctx.fillRect(x+8,320,26,12); ctx.fillRect(x+86,320,26,12); // headlights
+    ctx.fillStyle='#12161c'; ctx.fillRect(x+14,440,20,26); ctx.fillRect(x+86,440,20,26); // wheels
+  });
+  // curb planters
+  ctx.fillStyle='#31402c'; ctx.fillRect(40,330,40,120); ctx.fillRect(W-80,330,40,120);
+  // our hood at bottom
+  const hd=ctx.createLinearGradient(0,H-80,0,H); hd.addColorStop(0,'rgba(20,24,30,0)'); hd.addColorStop(1,'rgba(12,15,20,.96)');
+  ctx.fillStyle=hd; ctx.fillRect(0,H-80,W,80);
+}
+function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+function drawPerson(e){
+  const X=e.x*W, Y=0.60*H, s=H*0.16;
+  const bob=Math.sin(e.t*9)*s*0.05;
+  const swing=Math.sin(e.t*9)*s*0.16;
+  ctx.save(); ctx.translate(X,Y);
+  ctx.strokeStyle='#22303c'; ctx.lineWidth=s*0.13; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-swing,-s*0.5); ctx.stroke();     // back leg
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(swing,-s*0.5); ctx.stroke();      // front leg
+  ctx.fillStyle='#2f4457'; roundRect(ctx,-s*0.22,-s*0.95+bob,s*0.44,s*0.55,8); ctx.fill(); // torso
+  ctx.fillStyle='#3d5368'; ctx.beginPath(); ctx.arc(0,-s*1.18+bob,s*0.24,0,7); ctx.fill();  // head
+  ctx.fillStyle='#e6bd93'; ctx.beginPath(); ctx.arc(0,-s*1.18+bob,s*0.2,0,7); ctx.fill();  // face
+  ctx.restore();
+}
+function drawVehicle(e){
+  const X=e.x*W, Y=0.50*H, w=W*0.22, h=w*0.5;
+  ctx.save(); ctx.translate(X,Y);
+  ctx.fillStyle='#14181f'; ctx.fillRect(-w*0.16,h*0.72,w*0.34,w*0.2); ctx.fillRect(-w*0.16+w*0.78,h*0.72,w*0.34,w*0.2); // wheels
+  ctx.fillStyle=e.col; roundRect(ctx,-w/2,0,w,h,8); ctx.fill();                        // body
+  ctx.fillStyle='rgba(0,0,0,.35)'; roundRect(ctx,-w*0.22,h*0.06,w*0.3,h*0.4,6); ctx.fill(); // cabin
+  ctx.fillStyle='#cbd5e0'; ctx.fillRect(w/2-4,h*0.1,4,h*0.16); ctx.fillRect(-w/2,h*0.16,4,h*0.16); // lights
+  ctx.restore();
+}
+function draw(){
+  ctx.save();
+  // impact shake
+  if(S.impactT>0){const m=S.impactT*14; ctx.translate(rnd(-m,m),rnd(-m,m));}
+  if(S.mode==='driving')drawDriving(); else drawParking();
+  // rear tint
+  if(S.cam==='rear'){ctx.fillStyle='rgba(10,16,26,.18)';ctx.fillRect(0,0,W,H);}
+  // entities
+  for(const e of entities){
+    if(e.kind==='person')drawPerson(e);
+    else if(e.kind==='vehicle')drawVehicle(e);
+    else if(e.kind==='impact'){ctx.strokeStyle='rgba(255,77,94,.9)';ctx.lineWidth=5;ctx.strokeRect(W*0.36,H*0.4,W*0.28,H*0.25);}
+  }
+  ctx.restore();
+  // impact flash
+  if(S.flashT>0){$('#flash').style.opacity=Math.max(0,S.flashT/0.35);} else $('#flash').style.opacity=0;
+  // rain overlay in parking (subtle)
+}
+function updateBoxes(){
+  const boxEl=$('#boxes');
+  const divs=[];
+  for(const e of entities){
+    const b=e.box&&e.box(); if(!b)continue;
+    const d=document.createElement('div');
+    d.className='box '+b.cls;
+    d.style.left=(b.x*100)+'%'; d.style.top=(b.y*100)+'%'; d.style.width=(b.w*100)+'%'; d.style.height=(b.h*100)+'%';
+    d.innerHTML=`<span class="tag">${b.label}<span class="conf">${b.conf}</span></span>${b.plate?`<span class="plate-chip">${b.plate}</span>`:''}`;
+    divs.push(d);
+  }
+  // real-camera motion blob box
+  if(S.feed==='camera' && S.motionBox){
+    const b=S.motionBox; const d=document.createElement('div');
+    d.className='box person'; d.style.left=b.x+'%'; d.style.top=b.y+'%'; d.style.width=b.w+'%'; d.style.height=b.h+'%';
+    d.innerHTML='<span class="tag">MOTION<span class="conf">'+b.conf+'%</span></span>';
+    divs.push(d);
+  }
+  if(boxEl.innerHTML!==divs.map(d=>d.outerHTML).join('')) boxEl.replaceChildren(...divs);
+}
+
+/* ============================================================
+   HUD / stats
+   ============================================================ */
+function setMode(m){
+  S.mode=m; S.scenario.t=0; S.scenario.idx=0; entities=[];
+  $$('#modeToggle button').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
+  const mb=$('#modeBadge');
+  mb.textContent=m==='driving'?'● DRIVING':'● PARKING';
+  mb.className='mode-badge '+(m==='driving'?'driving':'parking');
+  $('#speedBadge').style.display=m==='driving'?'':'none';
+  $('#parkBadge').style.display=m==='parking'?'':'none';
+  $('#btnZones').style.display=m==='parking'&&S.feed==='demo'?'':'none';
+  $('#btnTalk').style.display=m==='parking'&&settings.twoWay?'':'none';
+  $('#zones').classList.toggle('on',m==='parking'&&S.zonesOn);
+  if(m==='parking') addEvent('system','Parking mode active','Sensors armed — monitoring person, vehicle and impact zones.');
+  else addEvent('system','Driving mode active','GPS + speed overlay on. Loop recording will start automatically.');
+  updateDetectVal();
+}
+function updateDetectVal(){
+  const parts=[];
+  if(settings.detPerson)parts.push('person'); if(settings.detVehicle)parts.push('vehicle'); if(settings.detImpact)parts.push('impact');
+  $('#detectVal').textContent=parts.join(' · ')||'disabled';
+}
+function updateHUD(){
+  $('#camLabel').textContent=S.cam.toUpperCase();
+  $('#clock').textContent=fmtClock(new Date());
+  $('#speedVal').textContent=Math.round(S.speed);
+  $('#statSpeed').textContent=Math.round(S.speed);
+  $('#gpsVal').textContent=S.gps.lat.toFixed(5)+', '+S.gps.lng.toFixed(5);
+  $('#satVal').textContent='LOCK '+(S.gps.lock?Math.round(rnd(6,10)):'--');
+  $('#statUptime').textContent=pad(Math.floor(S.uptime/60))+':'+pad(Math.floor(S.uptime%60));
+  $('#recBadgeWrap').style.display=S.recording?'':'none';
+  $('#recPill').style.display=S.recording?'':'none';
+  $('#recTxt').textContent='REC '+pad(Math.floor(S.uptime/60))+':'+pad(Math.floor(S.uptime%60));
+  const pct=Math.min(100,S.storage.used/S.storage.total*100);
+  $('#miniBar').style.width=pct+'%'; $('#statBar').style.width=pct+'%';
+  $('#miniBar').className=(pct>80?'warn':''); $('#statBar').className=(pct>80?'warn':'');
+  $('#statStore').textContent=S.storage.used.toFixed(1);
+  $('#storeTxt').textContent=S.storage.used.toFixed(1)+' GB';
+  $('#liveDot').className='dot live';
+  $('#liveTxt').textContent=(S.feed==='camera'?'LIVE · MY CAM':'DEMO · '+S.cam.toUpperCase());
+  $('#btnRec').classList.toggle('on',S.recording);
+  $('#btnCamTxt').textContent=S.cam.toUpperCase();
+  $('#talkBadge').style.display=(S.micOn||S.talk)?'':'none';
+  $('#lpVeil').classList.toggle('on',S.lowPower);
+  updateDetectVal();
+}
+
+/* ============================================================
+   EVENT FEED / DIGEST / TIMELINE
+   ============================================================ */
+function renderFeed(){
+  const el=$('#eventFeed');
+  if(!events.length){el.innerHTML='<p class="muted" style="margin:8px 0 4px">No events yet. Events appear the moment the AI decides something matters.</p>';return;}
+  el.innerHTML=events.slice(0,40).map(e=>{
+    const t=eventTypes[e.type]||{icon:'•',cls:''};
+    const meta=[];
+    meta.push(`<span class="sev-${e.cls==='critical'?'crit':e.cls==='warning'?'warn':'ok'}">${e.sev}</span>`);
+    if(e.mode)meta.push(`<span>${e.mode==='parking'?'🅿️ parking':'🚗 driving'}</span>`);
+    if(e.extra&&e.extra.protect)meta.push(`<span>🛡️ protected</span>`);
+    if(e.extra&&e.extra.dur)meta.push(`<span>⏱ ${e.extra.dur}</span>`);
+    return `<div class="ev ${e.cls}"><span class="ic">${t.icon}</span>
+      <div class="bd"><div class="tt"><span>${e.title}</span><span class="time">${e.time}</span></div>
+      <div class="ds">${e.desc}</div><div class="meta">${meta.join('')}</div></div>
+      ${e.thumb?`<img class="clipthumb" src="${e.thumb}" alt="">`:''}
+    </div>`;
+  }).join('');
+}
+function renderDigest(){
+  const c={person:0,vehicle:0,impact:0,system:0};
+  events.forEach(e=>{if(e.type in c)c[e.type]++;});
+  const chips=[];
+  if(c.person)chips.push(`🚶 ${c.person} person`); if(c.vehicle)chips.push(`🚗 ${c.vehicle} vehicle`);
+  if(c.impact)chips.push(`💥 ${c.impact} impact`); if(c.system)chips.push(`⚙️ ${c.system} system`);
+  $('#digestCounts').innerHTML=chips.map(s=>`<span>${s}</span>`).join('')||'<span>no events yet</span>';
+  if(!events.length){$('#digestTxt').textContent='Watching. I\u2019ll summarize the moment anything happens.';return;}
+  if(S.mode==='parking'){
+    $('#digestTxt').innerHTML= c.impact>0
+      ? `While you were away, the <b>most important moment</b> was a possible impact at ${events.find(e=>e.type==='impact').time}. ${c.person>0?`A person was detected ${c.person} time${c.person>1?'s':''} nearby. `:''}Everything else was filtered out.`
+      : `All quiet — ${c.person} person, ${c.vehicle} vehicle and ${c.impact} impact event${(c.person+c.vehicle+c.impact)===1?'':'s'} in this session. Nothing else worth your attention.`;
+  }else{
+    $('#digestTxt').innerHTML= c.impact>0
+      ? `Trip summary: ${events.find(e=>e.type==='impact').time} — possible impact, clip protected. ${c.impact>0?'Review the 30 s window.':''} Speed and route data saved.`
+      : `Trip running smoothly. ${c.system} notable event${c.system===1?'':'s'} so far — speed, route and loop footage are recording normally.`;
+  }
+}
+let tlFilter='all';
+function renderTimeline(){
+  const el=$('#timeline');
+  const list=events.filter(e=>tlFilter==='all'||e.type===tlFilter);
+  if(!list.length){el.innerHTML='<p class="muted">No events in this filter.</p>';return;}
+  el.innerHTML=list.map(e=>`<div class="tl-item ${e.cls}">
+    <div class="tg">${e.time} · ${e.mode==='parking'?'PARKING':'DRIVING'}</div>
+    <div class="tt" style="font-weight:600">${(eventTypes[e.type]||{icon:'•'}).icon} ${e.title}</div>
+    <div class="muted" style="margin-top:2px">${e.desc}</div>
+  </div>`).join('');
+}
+
+/* ============================================================
+   CAMERA (real) — optional
+   ============================================================ */
+async function enableCamera(){
+  try{
+    if(!('mediaDevices' in navigator)||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw {name:'Unsupported'};
+    const facing=S.cam==='front'?'user':'environment';
+    if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stream=null;}
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:1280},frameRate:{ideal:30}},audio:false});
+    S.stream=stream;
+    const v=$('#video'); v.srcObject=stream; await v.play();
+    S.feed='camera';
+    v.style.display='block'; feedCanvas.style.display='none';
+    startMotionDetect(); startGPS();
+    toast('📷 Live camera active — you\u2019re streaming','ok');
+  }catch(e){
+    if(S.stream){try{S.stream.getTracks().forEach(t=>t.stop());}catch(_){} S.stream=null;}
+    S.feed='demo'; feedCanvas.style.display='block'; $('#video').style.display='none';
+    let msg='Camera unavailable — using demo feed';
+    if(e&&e.name==='NotAllowedError') msg='🚫 Camera permission denied — using demo feed. Open the GitHub Pages URL (or live-preview tab) and tap Allow.';
+    else if(e&&e.name==='NotFoundError') msg='No camera found on this device — using demo feed.';
+    else if(e&&e.name==='NotReadableError') msg='Camera is busy in another app — using demo feed.';
+    else if(e&&e.name==='Unsupported') msg='This browser has no camera API — using demo feed.';
+    else if(e&&e.name==='SecurityError') msg='🔒 Camera blocked by the browser — using demo feed.';
+    else if(typeof window!=='undefined'&&window.isSecureContext===false) msg='🔒 Camera needs HTTPS. Open the GitHub Pages URL or the live-preview tab, not the sandboxed preview.';
+    toast(msg);
+  }
+  updateHUD();
+}
+/* ---- real GPS (driving mode) ---- */
+let geoWatch=null;
+function startGPS(){
+  if(!('geolocation' in navigator)||geoWatch!==null)return;
+  try{
+    geoWatch=navigator.geolocation.watchPosition(
+      pos=>{
+        S.gps.lat=pos.coords.latitude; S.gps.lng=pos.coords.longitude;
+        if(pos.coords.speed!=null&&pos.coords.speed>=0){S.speed=pos.coords.speed*3.6;}
+        S.gps.lock=true;
+      },
+      ()=>{ S.gps.lock=false; },
+      {enableHighAccuracy:true, maximumAge:800, timeout:8000}
+    );
+  }catch(_){}
+}
+function stopGPS(){ if(geoWatch!==null&&'geolocation' in navigator){try{navigator.geolocation.clearWatch(geoWatch);}catch(_){}} geoWatch=null; }
+function useDemoFeed(){
+  if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stream=null;}
+  stopGPS();
+  S.feed='demo'; $('#video').style.display='none'; feedCanvas.style.display='block';
+  S.motionBox=null; stopRecording(); toast('🎬 Demo feed active','ok'); updateHUD();
+}
+/* basic frame-diff motion detection */
+let motionCanvas, motionCtx, prevFrame=null, motionTick=0;
+function startMotionDetect(){
+  motionCanvas=document.createElement('canvas'); motionCanvas.width=96; motionCanvas.height=54;
+  motionCtx=motionCanvas.getContext('2d');
+}
+function detectMotion(){
+  if(S.feed!=='camera'||S.mode!=='parking'||S.lowPower||!motionCanvas)return;
+  const v=$('#video'); if(!v.videoWidth)return;
+  if(++motionTick%6!==0)return;
+  motionCtx.drawImage(v,0,0,96,54);
+  const d=motionCtx.getImageData(0,0,96,54).data;
+  if(!prevFrame){prevFrame=new Uint8ClampedArray(d);return;}
+  let minX=96,minY=54,maxX=0,maxY=0,cnt=0;
+  for(let i=0;i<96*54;i++){
+    const r=Math.abs(d[i*4]-prevFrame[i*4]),g=Math.abs(d[i*4+1]-prevFrame[i*4+1]),b=Math.abs(d[i*4+2]-prevFrame[i*4+2]);
+    if((r+g+b)/3>26){const x=i%96,y=(i/96)|0; if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;cnt++;}
+  }
+  prevFrame.set(d);
+  if(cnt>120){
+    S.motionBox={x:minX/96*100,y:minY/54*100,w:(maxX-minX)/96*100,h:(maxY-minY)/54*100,conf:Math.min(98,Math.round(60+cnt/8))};
+    const t=performance.now();
+    if(t-S.lastMotionEvent>12000){S.lastMotionEvent=t; addEvent('person','Motion detected','Motion in monitored zone while parked. Clip recorded.',{});}
+  } else S.motionBox=null;
+}
+/* loop recording (real) */
+function toggleRecording(){
+  if(S.feed==='camera'&&S.stream&&window.MediaRecorder){ realToggleRecording(); return; }
+  S.recording=!S.recording;
+  if(S.recording) addEvent('system','Loop recording ON','Segments: '+(settings.loopLen)+' · oldest overwritten automatically.');
+  else addEvent('system','Recording paused');
+  updateHUD();
+}
+function startRealRecorder(){
+  if(!S.stream) return;
+  S.rec=new MediaRecorder(S.stream,{mimeType:'video/webm'});
+  S.chunks=[];
+  S.rec.ondataavailable=e=>{if(e.data.size)S.chunks.push(e.data);};
+  S.rec.onstop=()=>{
+    if(S.chunks.length){
+      const blob=new Blob(S.chunks,{type:'video/webm'}); saveSegment(blob);
+      if(S.protectNext){ S.protectNext=false; const seg=S.segments[S.segments.length-1]; if(seg) addProtectedClip(seg); }
+    }
+  };
+  S.rec.start();
+  S.recording=true;
+}
+function addProtectedClip(seg){
+  clips.unshift({id:Math.random().toString(36).slice(2),title:'Protected — real clip',sizeMb:seg.size,status:'local',ts:nowStr(),url:seg.url});
+  renderClips();
+}
+function realToggleRecording(){
+  if(S.recording){stopRecording();}
+  else{
+    try{ startRealRecorder(); addEvent('system','Loop recording ON (real)','Recording camera stream in segments.'); }
+    catch(e){ toast('Recording not supported here — simulated instead'); S.recording=true; }
+  }
+  updateHUD();
+}
+function saveSegment(blob){
+  const url=URL.createObjectURL(blob);
+  S.segments.push({url,ts:new Date(),size:(blob.size/1048576).toFixed(1)});
+  if(S.segments.length>5){const old=S.segments.shift(); URL.revokeObjectURL(old.url);}
+}
+function stopRecording(){ if(S.rec&&S.rec.state!=='inactive'){try{S.rec.stop();}catch(_){}} S.recording=false; }
+function protectSegment(){
+  S.protectNext=true;
+  if(S.rec&&S.rec.state!=='inactive'){try{S.rec.stop();}catch(_){}}
+  if(S.recording){ setTimeout(()=>{ try{ startRealRecorder(); }catch(_){} },400); }
+}
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(S.feed==='demo'){
+    if(!S.lowPower)updateScenario(dt);
+    draw(); updateBoxes();
+  } else {
+    detectMotion(); updateBoxes();
+  }
+  // speed simulation (demo feed only — real camera uses GPS speed)
+  if(S.mode==='driving'&&!S.lowPower&&S.feed==='demo'){
+    if(S.targetSpeed<12) S.targetSpeed=Math.max(4,S.targetSpeed+rnd(-2,3));
+    else S.targetSpeed=Math.min(88,Math.max(30,S.targetSpeed+rnd(-4,4)));
+    S.speed+=(S.targetSpeed-S.speed)*Math.min(1,dt*1.6);
+    S.gps.lat+=rnd(-0.00005,0.00005); S.gps.lng+=rnd(-0.00005,0.00005);
+    // storage growth
+    if(S.recording){
+      S.storage.used=Math.min(S.storage.total,S.storage.used+dt*0.02);
+      S.uptime+=dt;
+      if(S.storage.used>=S.storage.total) S.storage.used=S.storage.total*0.6;
+    }
+  }
+  if(S.mode==='parking'&&S.recording){S.storage.used=Math.min(S.storage.total,S.storage.used+dt*0.004);}
+  updateHUD();
+  requestAnimationFrame(frame);
+}
+
+/* ============================================================
+   ZONES / TALK / SNAPSHOT
+   ============================================================ */
+function buildZones(){
+  const z=$('#zones'); z.innerHTML='';
+  for(let i=0;i<9;i++){
+    const d=document.createElement('div');
+    d.className='zone '+(S.zones[i]?'armed':'disarmed');
+    d.innerHTML=`<span class="zl">Z${i+1}</span>`;
+    d.addEventListener('click',ev=>{ev.stopPropagation();S.zones[i]=!S.zones[i];d.className='zone '+(S.zones[i]?'armed':'disarmed');
+      toast((S.zones[i]?'✅ Zone '+(i+1)+' armed':'Zone '+(i+1)+' disarmed'));});
+    z.appendChild(d);
+  }
+}
+function toggleTalk(){
+  if(!S.talk){
+    S.talk=true;
+    toast('🎤 Two-way talk open — speaking through the camera','ok');
+    if(settings.twoWay&&S.feed==='camera'&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
+      navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{S.micStream=s;S.micOn=true;}).catch(()=>{});
+    }
+  } else {
+    S.talk=false; S.micOn=false;
+    if(S.micStream){S.micStream.getTracks().forEach(t=>t.stop());S.micStream=null;}
+    toast('Talk session ended');
+  }
+  updateHUD();
+}
+function snapshot(){
+  let url=null;
+  try{ url=S.feed==='demo'?feedCanvas.toDataURL('image/jpeg',0.85):(S.stream?snapVideo():null); }catch(_){}
+  addEvent('snapshot','Snapshot saved','Manual snapshot captured and stored locally.',{url});
+  $('#flash').style.opacity=0.7; setTimeout(()=>$('#flash').style.opacity=0,120);
+  if(url){clips.unshift({id:Math.random().toString(36).slice(2),title:'Snapshot',sizeMb:'0.2',status:'local',ts:nowStr(),url});renderClips();}
+}
+function snapVideo(){ const v=$('#video'); const c=document.createElement('canvas'); c.width=v.videoWidth;c.height=v.videoHeight; c.getContext('2d').drawImage(v,0,0); return c.toDataURL('image/jpeg',0.85); }
+
+/* ============================================================
+   WIRING
+   ============================================================ */
+function copyText(txt){
+  const ok=()=>toast('✅ Timeline copied to clipboard','ok');
+  const bad=()=>toast('Clipboard unavailable — you can read the timeline above');
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(ok).catch(bad); return; }
+  try{
+    const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const worked=document.execCommand('copy'); ta.remove(); worked?ok():bad();
+  }catch(_){ bad(); }
+}
+function bind(){
+  $$('#modeToggle button').forEach(b=>b.addEventListener('click',()=>{ if(S.mode!==b.dataset.mode) setMode(b.dataset.mode); }));
+  $$('#tabs button').forEach(b=>b.addEventListener('click',()=>{
+    $$('#tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+    ['live','timeline','settings'].forEach(v=>$('#view-'+v).classList.toggle('hidden',v!==b.dataset.view));
+    if(b.dataset.view==='timeline')renderTimeline();
+  }));
+  $('#settingsBtn').addEventListener('click',()=>{$$('#tabs button').forEach(x=>x.classList.remove('active'));$$('#tabs button')[2].classList.add('active');
+    ['live','timeline','settings'].forEach(v=>$('#view-'+v).classList.toggle('hidden',v!=='settings'));});
+  $('#btnRec').addEventListener('click',toggleRecording);
+  $('#btnCam').addEventListener('click',()=>{S.cam=S.cam==='front'?'rear':'front';
+    if(S.feed==='camera'){enableCamera();} updateHUD();});
+  $('#btnSnap').addEventListener('click',snapshot);
+  $('#btnProtect').addEventListener('click',()=>{addEvent('system','Footage protected','Current loop segment locked from overwrite.',{protect:true}); if(S.feed==='camera')protectSegment(); pushClip('Protected — manual',false);});
+  $('#btnZones').addEventListener('click',()=>{$('#zones').classList.toggle('on');S.zonesOn=$('#zones').classList.contains('on');toast(S.zonesOn?'Motion zones shown — tap to arm/disarm':'Motion zones hidden');});
+  $('#btnTalk').addEventListener('click',toggleTalk);
+  $('#btnTalk').addEventListener('pointerdown',e=>{e.preventDefault();$('#btnTalk').classList.add('holding');});
+  $('#btnTalk').addEventListener('pointerup',()=>$('#btnTalk').classList.remove('holding'));
+  $('#lowPowerBtn').addEventListener('click',()=>{S.lowPower=!S.lowPower; settings.lowPower=S.lowPower; syncSetting('lowPower');
+    const cb=document.querySelector('[data-set="lowPower"]'); if(cb)cb.checked=S.lowPower;
+    toast(S.lowPower?'🌙 Low-power mode — screen off, sensors armed':'Display back on'); updateHUD();});
+  $('#exportBtn').addEventListener('click',()=>{
+    const txt=events.map(e=>`${e.time} — ${e.title}\n   ${e.desc}`).join('\n');
+    copyText(txt);
+  });
+  $('#clearBtn').addEventListener('click',()=>{events=[];renderFeed();renderDigest();renderTimeline();toast('Timeline cleared');});
+  $('#useCameraBtn').addEventListener('click',enableCamera);
+  $('#useDemoBtn').addEventListener('click',useDemoFeed);
+  $('#notifPermBtn').addEventListener('click',()=>{try{Notification.requestPermission().then(p=>toast(p==='granted'?'✅ Notifications enabled':'Notifications: '+p));}catch(_){toast('Notifications not available in this preview');}});
+  $$('#tlFilter button').forEach(b=>b.addEventListener('click',()=>{$$('#tlFilter button').forEach(x=>x.classList.remove('active'));b.classList.add('active');tlFilter=b.dataset.f;renderTimeline();}));
+  // settings bindings
+  $$('[data-set]').forEach(el=>{
+    const k=el.dataset.set;
+    if(el.type==='checkbox'){el.checked=!!settings[k];
+      el.addEventListener('change',()=>{settings[k]=el.checked;syncSetting(k);
+        if(k==='twoWay')$('#btnTalk').style.display=(S.mode==='parking'&&settings.twoWay)?'':'none';
+        if(k==='zonesOn'){S.zonesOn=settings.zonesOn;$('#zones').classList.toggle('on',S.mode==='parking'&&S.zonesOn);}
+        if(k==='lowPower'){S.lowPower=settings.lowPower;updateHUD();}
+        if(k==='autoStart'&&settings.autoStart&&!S.recording){toggleRecording();}
+        updateDetectVal();
+      });}
+    else{el.value=settings[k];
+      el.addEventListener('change',()=>{settings[k]=el.value;syncSetting(k);});}
+  });
+  // welcome modal
+  $('#welcomeDemo').addEventListener('click',()=>{start(true);});
+  $('#welcomeCam').addEventListener('click',()=>{start(false);});
+}
+function syncSetting(k){try{store.setItem('sdc_settings',JSON.stringify(settings));}catch(_){}}
+function start(useDemo){
+  $('#welcome').style.display='none';
+  if(useDemo){useDemoFeed();} else {enableCamera();}
+  S.mode='driving'; setMode('driving');
+  if(settings.autoStart&&S.feed==='demo'){S.recording=true;addEvent('system','Loop recording ON','Auto-start: recording began when power was applied.');}
+  requestAnimationFrame(frame);
+  setInterval(()=>updateHUD(),1000);
+}
+
+/* boot */
+bind(); buildZones(); updateHUD(); renderClips(); renderDigest(); updateStats();
+try{ if(store.getItem('sdc_seen')){ $('#welcome').style.display='none'; start(true);} else { $('#welcome').style.display='grid'; } }
+catch(_){ $('#welcome').style.display='grid'; }
+function updateStats(){ $('#statEvents').textContent=events.length; }
+
+/* mark seen */
+try{store.setItem('sdc_seen','1');}catch(_){}
+</script>
+</body>
+</html>

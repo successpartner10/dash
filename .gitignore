@@ -1,0 +1,10 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Local zips (the deliverable lives outside the repo)
+*.zip
+
+# Editor
+.vscode/
+.idea/
