@@ -2,7 +2,7 @@
 
 > **Live app:** https://successpartner10.github.io/dash/
 >
-> A single-file web app. No build step, no dependencies, no server. Works offline once downloaded.
+> Installable **PWA** · single-file app · no build step, no server. Works offline once installed.
 
 **Smart Dash Cam** combines a **Driving Mode** and a **Parking Mode** into one app — and instead of
 giving you 8 hours of video, its **AI timeline** tells you what actually mattered:
@@ -25,7 +25,7 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 - **Accident detection** — G-sensor impact detection + harsh-braking detection
 - **Protected footage** — clips locked from overwrite on impact
 - **Front / rear camera** switch
-- **Local storage meter**
+- **Local storage meter** — real on-device usage & quota
 - **Low-power mode** — screen off, sensors still armed
 
 ### 🅿️ Parking mode
@@ -46,6 +46,37 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 - Full-screen **timeline view** with filters (people / vehicles / impacts / system)
 - **Copy-to-clipboard export** of the whole timeline
 
+### 📱 PWA (installable app)
+- **Install to your home screen** — tap 📲 (or the browser's "Install app" prompt)
+- **Full-screen standalone** mode, own icon & splash color
+- **Offline** — a service worker caches the app so it opens with no connection
+
+---
+
+## 💾 Where is your footage stored?
+
+**On the device itself — nothing leaves the phone unless you download it.**
+
+| What | Where | Persists after reload? |
+|---|---|---|
+| Loop-recording segments (real camera) | **Origin Private File System (OPFS)** — the browser's per-site private filesystem, via `navigator.storage.getDirectory()` | ✅ Yes |
+| Snapshots | Same OPFS, in a `clips/` folder | ✅ Yes |
+| Settings & preferences | `localStorage` | ✅ Yes |
+| Cloud clips (upload status) | Simulated (no backend yet) | ❌ demo only |
+
+You can see exactly what's on disk in the **💾 Local storage** card in the Live view: each file's
+name, real size and timestamp, with **⬇ download** and **🗑 delete** buttons, plus a "Clear all"
+button. The Storage meter (top pill + stat card) shows **real usage vs. your browser's storage
+quota** (`navigator.storage.estimate()`).
+
+Notes:
+- Browsers cap per-site storage (typically a percentage of free disk). The meter reflects the
+  real quota.
+- Loop recording keeps the newest **12 segments** on disk and deletes the rest — that's the
+  "loop" behavior.
+- If the browser/preview doesn't support OPFS, the app falls back to in-memory clips for the
+  session and tells you to download them before leaving.
+
 ---
 
 ## ▶️ How to use
@@ -53,15 +84,15 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 1. Open **https://successpartner10.github.io/dash/** (best on a phone).
 2. **Live view starts from your real camera.** Tap **"Use my real camera"** (or it auto-starts
    on return visits) for the actual camera, real GPS + speed, real frame-diff motion detection,
-   and real loop recording (`MediaRecorder`). If no camera is available — or it's blocked
-   (e.g. the sandboxed preview) — the app automatically falls back to the 🎬 **demo feed**.
-3. Toggle **Driving / Parking** modes from the top bar.
-4. Watch the **AI timeline** fill up instead of watching 8 hours of video.
+   and real loop recording. If no camera is available — or it's blocked (e.g. a sandboxed
+   preview) — it automatically falls back to the 🎬 **demo feed**.
+3. Tap **📲 Install** to add it to your home screen as a real app.
+4. Toggle **Driving / Parking** modes from the top bar.
+5. Watch the **AI timeline** fill up instead of watching 8 hours of video.
 
 > **Camera requirements:** `getUserMedia` (camera), geolocation (GPS), `MediaRecorder`
 > (recording) and notifications all require **HTTPS** and a **top-level page**. The GitHub
-> Pages URL provides both. (In the in-app sandboxed preview, the camera is blocked, so the
-> app automatically falls back to the demo feed.)
+> Pages URL provides both.
 
 ---
 
@@ -69,9 +100,14 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 
 ```
 dash/
-├── index.html     ← the entire app (HTML + CSS + JS, zero dependencies)
-├── README.md      ← this file
-└── .nojekyll      ← disables Jekyll processing on GitHub Pages
+├── index.html      ← the entire app (HTML + CSS + JS, zero dependencies)
+├── manifest.json   ← PWA manifest (name, icons, standalone)
+├── sw.js           ← service worker (offline cache)
+├── icon-192.png    ← app icons (192 / 512 / 180)
+├── icon-512.png
+├── icon-180.png
+├── README.md       ← this file
+└── .nojekyll       ← disables Jekyll processing on GitHub Pages
 ```
 
 ---
@@ -83,8 +119,8 @@ The repo lives at `github.com/successpartner10/dash` and is published via **GitH
 ```bash
 git clone https://github.com/successpartner10/dash.git
 cd dash
-# edit index.html …
-git add index.html
+# edit files …
+git add -A
 git commit -m "Update dashcam app"
 git push origin main
 ```
@@ -130,7 +166,8 @@ Settings persist in `localStorage` (with an in-memory fallback for sandboxed pre
 | Video | Simulated canvas render | ✅ real camera stream |
 | GPS / speed | Simulated | ✅ real `geolocation` |
 | Person / vehicle / impact detection | Scripted scenario + drawn entities | ✅ real frame-diff **motion** detection (blob boxes) |
-| Loop recording | Simulated counter | ✅ real `MediaRecorder` segments |
+| Loop recording | Simulated counter | ✅ real `MediaRecorder`, **persisted to OPFS** |
+| Storage meter | Simulated | ✅ real `navigator.storage.estimate()` usage/quota |
 | License-plate capture | Simulated plate strings | ⚠️ needs on-device OCR (see roadmap) |
 | Cloud upload / push | Simulated status changes | ⚠️ needs a backend (GitHub Pages is static) |
 | True background parking mode | n/a | ⚠️ needs a native wrapper |

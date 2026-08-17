@@ -1,0 +1,18 @@
+{
+  "name": "Smart Dash Cam",
+  "short_name": "Dash Cam",
+  "description": "One app, two automatic modes — driving (GPS, speed, loop recording, accident detection) and parking (person/vehicle/impact detection, two-way talk) — with an AI event timeline.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0e13",
+  "theme_color": "#0a0e13",
+  "categories": ["navigation", "utilities", "productivity"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

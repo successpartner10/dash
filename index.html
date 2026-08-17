@@ -7,6 +7,12 @@
 <title>Smart Dash Cam</title>
 <meta name="description" content="Smart Dash Cam — one app, two automatic modes: driving (GPS, speed, loop recording, accident detection) and parking (person/vehicle/impact detection, live remote video, two-way talk), with an AI event timeline.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23ffb02e'/><rect x='20' y='34' width='52' height='38' rx='8' fill='white'/><rect x='68' y='44' width='16' height='16' rx='4' fill='white'/><circle cx='38' cy='53' r='6' fill='%23ffb02e'/></svg>">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dash Cam">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
 :root{
   --bg:#0a0e13; --panel:#121820; --panel2:#1a222c; --line:#232e3a;
@@ -253,6 +259,7 @@ small{font-size:11.5px}
       <span class="pill"><span class="dot live" id="liveDot"></span><span id="liveTxt">LIVE</span></span>
       <span class="pill" id="recPill" style="display:none"><span class="dot rec"></span><span id="recTxt">REC 00:00</span></span>
       <span class="pill">💾 <span id="storeTxt">12.4 GB</span></span>
+      <button class="icon-btn" id="installBtn" style="display:none" title="Install app">📲</button>
       <button class="icon-btn" id="lowPowerBtn" title="Low-power mode">🌙</button>
       <button class="icon-btn" id="settingsBtn" title="Settings">⚙️</button>
     </div>
@@ -339,7 +346,7 @@ small{font-size:11.5px}
           <div class="stat"><div class="k">Speed (GPS)</div><div class="v"><span id="statSpeed">0</span> <small>km/h</small></div></div>
           <div class="stat"><div class="k">Trip time</div><div class="v" id="statUptime">00:00</div></div>
           <div class="stat"><div class="k">Events</div><div class="v" id="statEvents">0</div></div>
-          <div class="stat"><div class="k">Storage</div><div class="v"><span id="statStore">12.4</span> <small>/ 64 GB</small><div class="bar"><i id="statBar"></i></div></div>
+          <div class="stat"><div class="k">Storage</div><div class="v"><span id="statStore">12.4</span> <small id="statTotal">/ 64 GB</small><div class="bar"><i id="statBar"></i></div></div>
         </div>
       </div>
 
@@ -363,6 +370,12 @@ small{font-size:11.5px}
         <div class="card">
           <h3>Cloud event clips <span class="spacer">☁️</span></h3>
           <div id="clipList"></div>
+        </div>
+
+        <div class="card">
+          <h3>Local storage <span class="spacer" id="storeUsage"></span></h3>
+          <div id="storeList"></div>
+          <div style="margin-top:10px"><button class="btn danger" id="storeClearBtn" style="width:100%">🗑 Clear all local files</button></div>
         </div>
       </div>
     </div>
@@ -493,6 +506,7 @@ const S={
   talk:false, micOn:false,
   lastMotionEvent:0,
   stream:null, rec:null, chunks:[], segments:[], protectedClips:[], protectNext:false,
+  realUsage:0, realQuota:0,
 };
 const settings=Object.assign({
   autoStart:true, loopLen:'3 min', quality:'1080p FHD', gSense:'Medium', protectBrake:true,
@@ -787,11 +801,17 @@ function updateHUD(){
   $('#recBadgeWrap').style.display=S.recording?'':'none';
   $('#recPill').style.display=S.recording?'':'none';
   $('#recTxt').textContent='REC '+pad(Math.floor(S.uptime/60))+':'+pad(Math.floor(S.uptime%60));
-  const pct=Math.min(100,S.storage.used/S.storage.total*100);
+  // storage: real on-device usage in camera mode, simulated meter in demo mode
+  let usedBytes,totalBytes;
+  if(S.feed==='camera'&&S.realQuota>0){ usedBytes=S.realUsage; totalBytes=S.realQuota; }
+  else { usedBytes=S.storage.used*1e9; totalBytes=S.storage.total*1e9; }
+  const pct=totalBytes>0?Math.min(100,usedBytes/totalBytes*100):0;
   $('#miniBar').style.width=pct+'%'; $('#statBar').style.width=pct+'%';
   $('#miniBar').className=(pct>80?'warn':''); $('#statBar').className=(pct>80?'warn':'');
-  $('#statStore').textContent=S.storage.used.toFixed(1);
-  $('#storeTxt').textContent=S.storage.used.toFixed(1)+' GB';
+  const usedGB=usedBytes/1e9, totalGB=totalBytes/1e9;
+  $('#statStore').textContent=usedGB>=1?usedGB.toFixed(2):(usedBytes/1e6).toFixed(1);
+  $('#statTotal').textContent=totalBytes>0?(' / '+(totalGB>=1?Math.round(totalGB)+' GB':fmtBytes(totalBytes))):'';
+  $('#storeTxt').textContent=fmtBytes(usedBytes);
   $('#liveDot').className='dot live';
   $('#liveTxt').textContent=(S.feed==='camera'?'LIVE · MY CAM':'DEMO · '+S.cam.toUpperCase());
   $('#btnRec').classList.toggle('on',S.recording);
@@ -903,6 +923,114 @@ function useDemoFeed(){
   S.feed='demo'; $('#video').style.display='none'; feedCanvas.style.display='block';
   S.motionBox=null; stopRecording(); toast('🎬 Demo feed active','ok'); updateHUD();
 }
+/* ============================================================
+   REAL PERSISTENT STORAGE (Origin Private File System)
+   Where your footage lives: on this device, in the browser's
+   per-origin private filesystem (navigator.storage.getDirectory).
+   It survives reloads and is downloadable — no server needed.
+   ============================================================ */
+const FS={
+  ok:false, root:null, recDir:null, clipDir:null,
+  async init(){
+    try{
+      if(!('storage' in navigator)||!navigator.storage||!navigator.storage.getDirectory) return false;
+      this.root=await navigator.storage.getDirectory();
+      this.recDir=await this.root.getDirectoryHandle('recordings',{create:true});
+      this.clipDir=await this.root.getDirectoryHandle('clips',{create:true});
+      this.ok=true; return true;
+    }catch(e){ this.ok=false; return false; }
+  },
+  async write(dir,name,blob){
+    if(!this.ok) return null;
+    try{ const fh=await dir.getFileHandle(name,{create:true}); const w=await fh.createWritable(); await w.write(blob); await w.close(); return fh; }
+    catch(e){ return null; }
+  },
+  async list(dir){
+    if(!this.ok) return [];
+    const out=[];
+    try{ for await(const [name,fh] of dir.entries()){ try{ const f=await fh.getFile(); out.push({name,size:f.size,ts:f.lastModified}); }catch(_){} } }catch(_){}
+    return out.sort((a,b)=>b.ts-a.ts);
+  },
+  async readFile(dir,name){
+    if(!this.ok) return null;
+    try{ const fh=await dir.getFileHandle(name); return await fh.getFile(); }catch(e){ return null; }
+  },
+  async remove(dir,name){ if(!this.ok) return; try{ await dir.removeEntry(name); }catch(_){} },
+};
+function fmtBytes(b){
+  if(!b)return '0 B';
+  if(b>=1e9)return (b/1e9).toFixed(2)+' GB';
+  if(b>=1e6)return (b/1e6).toFixed(1)+' MB';
+  if(b>=1e3)return (b/1e3).toFixed(0)+' KB';
+  return b+' B';
+}
+function stamp(){ const d=new Date(); return ''+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'_'+pad(d.getHours())+'-'+pad(d.getMinutes())+'-'+pad(d.getSeconds()); }
+function downloadBlob(blob,name){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+}
+let storeFiles=[];
+async function refreshStorage(){
+  await FS.init();
+  storeFiles=[];
+  if(FS.ok){
+    const rec=await FS.list(FS.recDir);
+    const clp=await FS.list(FS.clipDir);
+    storeFiles=[...rec.map(f=>({...f,kind:'rec'})),...clp.map(f=>({...f,kind:'clip'}))].sort((a,b)=>b.ts-a.ts);
+  }
+  let usage=0,quota=0;
+  try{ if(navigator.storage&&navigator.storage.estimate){ const e=await navigator.storage.estimate(); usage=e.usage||0; quota=e.quota||0; } }catch(_){}
+  if(!quota){ storeFiles.forEach(f=>usage+=f.size); }
+  S.realUsage=usage; S.realQuota=quota;
+  renderStorageCard(); updateHUD();
+}
+function renderStorageCard(){
+  const el=$('#storeList');
+  $('#storeUsage').textContent=(S.realQuota?fmtBytes(S.realUsage)+' / '+fmtBytes(S.realQuota):fmtBytes(S.realUsage));
+  if(!FS.ok){
+    el.innerHTML='<p class="muted" style="margin:6px 0 2px">Persistent on-device storage isn\u2019t available in this browser/preview — clips are held in memory for this session. Download them before leaving.</p>';
+    return;
+  }
+  if(!storeFiles.length){
+    el.innerHTML='<p class="muted" style="margin:6px 0 2px">No files yet. Loop segments &amp; snapshots are saved here, on this device.</p>';
+    return;
+  }
+  el.innerHTML=storeFiles.slice(0,20).map(f=>`<div class="clip" data-name="${f.name}" data-dir="${f.kind==='rec'?'recordings':'clips'}">
+    <span class="ci">${f.kind==='rec'?'🎞️':'📸'}</span>
+    <div class="cb"><div class="ct">${f.name}</div><div class="cs">${new Date(f.ts).toLocaleString()} · ${fmtBytes(f.size)}</div></div>
+    <button class="btn" data-act="dl" title="Download">⬇</button>
+    <button class="btn danger" data-act="rm" title="Delete">🗑</button>
+  </div>`).join('');
+  el.querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',async ev=>{
+    ev.stopPropagation();
+    const row=b.closest('.clip'); if(!row)return;
+    const dir=row.dataset.dir==='recordings'?FS.recDir:FS.clipDir;
+    if(b.dataset.act==='dl'){ const f=await FS.readFile(dir,row.dataset.name); if(f)downloadBlob(f,row.dataset.name); }
+    else{ await FS.remove(dir,row.dataset.name); toast('🗑 Deleted '+row.dataset.name); refreshStorage(); }
+  }));
+}
+async function persistSegment(blob){
+  await FS.init(); if(!FS.ok)return;
+  try{
+    await FS.write(FS.recDir,'seg_'+stamp()+'.webm',blob);
+    const list=await FS.list(FS.recDir);            // loop recording: keep newest 12, drop the rest
+    for(const f of list.slice(12)){ await FS.remove(FS.recDir,f.name); }
+    refreshStorage();
+  }catch(_){}
+}
+async function persistSnapshot(){
+  await FS.init(); if(!FS.ok)return;
+  try{
+    let canvas=(S.feed==='demo')?feedCanvas:null;
+    if(!canvas){ const v=$('#video'); if(!v.videoWidth)return; const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight; c.getContext('2d').drawImage(v,0,0); canvas=c; }
+    if(!canvas.toBlob)return;
+    const blob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.85));
+    if(blob){ await FS.write(FS.clipDir,'snap_'+stamp()+'.jpg',blob); refreshStorage(); }
+  }catch(_){}
+}
+
 /* basic frame-diff motion detection */
 let motionCanvas, motionCtx, prevFrame=null, motionTick=0;
 function startMotionDetect(){
@@ -966,6 +1094,7 @@ function saveSegment(blob){
   const url=URL.createObjectURL(blob);
   S.segments.push({url,ts:new Date(),size:(blob.size/1048576).toFixed(1)});
   if(S.segments.length>5){const old=S.segments.shift(); URL.revokeObjectURL(old.url);}
+  persistSegment(blob); // also write to on-device persistent storage
 }
 function stopRecording(){ if(S.rec&&S.rec.state!=='inactive'){try{S.rec.stop();}catch(_){}} S.recording=false; }
 function protectSegment(){
@@ -1037,6 +1166,7 @@ function snapshot(){
   addEvent('snapshot','Snapshot saved','Manual snapshot captured and stored locally.',{url});
   $('#flash').style.opacity=0.7; setTimeout(()=>$('#flash').style.opacity=0,120);
   if(url){clips.unshift({id:Math.random().toString(36).slice(2),title:'Snapshot',sizeMb:'0.2',status:'local',ts:nowStr(),url});renderClips();}
+  persistSnapshot();
 }
 function snapVideo(){ const v=$('#video'); const c=document.createElement('canvas'); c.width=v.videoWidth;c.height=v.videoHeight; c.getContext('2d').drawImage(v,0,0); return c.toDataURL('image/jpeg',0.85); }
 
@@ -1053,6 +1183,17 @@ function copyText(txt){
     const worked=document.execCommand('copy'); ta.remove(); worked?ok():bad();
   }catch(_){ bad(); }
 }
+/* ============================================================
+   PWA — service worker + install prompt
+   ============================================================ */
+let deferredPrompt=null;
+if('serviceWorker' in navigator && window.isSecureContext!==false){
+  window.addEventListener('load',()=>{ try{ navigator.serviceWorker.register('sw.js'); }catch(_){} });
+}
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault(); deferredPrompt=e;
+  const b=$('#installBtn'); if(b)b.style.display='';
+});
 function bind(){
   $$('#modeToggle button').forEach(b=>b.addEventListener('click',()=>{ if(S.mode!==b.dataset.mode) setMode(b.dataset.mode); }));
   $$('#tabs button').forEach(b=>b.addEventListener('click',()=>{
@@ -1081,6 +1222,19 @@ function bind(){
   $('#clearBtn').addEventListener('click',()=>{events=[];renderFeed();renderDigest();renderTimeline();toast('Timeline cleared');});
   $('#useCameraBtn').addEventListener('click',enableCamera);
   $('#useDemoBtn').addEventListener('click',useDemoFeed);
+  $('#installBtn').addEventListener('click',async()=>{
+    if(!deferredPrompt)return;
+    deferredPrompt.prompt();
+    const r=await deferredPrompt.userChoice;
+    deferredPrompt=null; $('#installBtn').style.display='none';
+    if(r&&r.outcome==='accepted')toast('📲 Installing Smart Dash Cam…','ok');
+  });
+  $('#storeClearBtn').addEventListener('click',async()=>{
+    if(!FS.ok){ toast('No persistent storage available in this browser'); return; }
+    const all=[...storeFiles];
+    for(const f of all){ await FS.remove(f.kind==='rec'?FS.recDir:FS.clipDir,f.name); }
+    toast('🗑 Cleared all local files'); refreshStorage();
+  });
   $('#notifPermBtn').addEventListener('click',()=>{try{Notification.requestPermission().then(p=>toast(p==='granted'?'✅ Notifications enabled':'Notifications: '+p));}catch(_){toast('Notifications not available in this preview');}});
   $$('#tlFilter button').forEach(b=>b.addEventListener('click',()=>{$$('#tlFilter button').forEach(x=>x.classList.remove('active'));b.classList.add('active');tlFilter=b.dataset.f;renderTimeline();}));
   // settings bindings
@@ -1126,6 +1280,7 @@ async function start(useDemo){
 
 /* boot — real camera first, demo only as fallback */
 bind(); buildZones(); updateHUD(); renderClips(); renderDigest(); updateStats();
+FS.init().then(()=>{ refreshStorage(); setInterval(refreshStorage,15000); });
 try{ if(store.getItem('sdc_seen')){ $('#welcome').style.display='none'; start(false);} else { $('#welcome').style.display='grid'; } }
 catch(_){ $('#welcome').style.display='grid'; }
 function updateStats(){ $('#statEvents').textContent=events.length; }
