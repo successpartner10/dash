@@ -93,27 +93,26 @@ GitHub Pages stays as the **front-end host**; it cannot do #2 by itself (static 
 9. **Schedules** — ✅ auto arm/disarm by time, overnight windows supported.
 10. **Privacy mode** — ✅ geofence pause within 250 m of home ("Set home" button).
 
-### Phase 2 — Native shell *(Capacitor)*
-1. Wrap the existing UI (single `index.html` ports cleanly).
-2. **Android foreground service** — camera keeps running with screen off (persistent
-   notification, as Android requires).
-3. **Wakelock + screen-off sentry** for parking mode.
-4. **Local notifications** (no backend needed) for motion/impact on the *camera* device.
-5. Ship an **APK** (Android) + TestFlight **IPA** (iOS).
+### Phase 2 — Native shell *(Capacitor)* ✅ SCAFFOLDED (build APK locally)
+1. ✅ Wrap the existing UI — `native/` Capacitor 6 project generated.
+2. ✅ **Android foreground service** — `SentryService.java` (notification + wake lock).
+3. ✅ **Wakelock + screen-off sentry** — `SentryPlugin.java` bridge + JS `Native.*` hooks.
+4. 🔶 **Local notifications** — not yet (next).
+5. 🔶 Ship an **APK** / **IPA** — needs Android Studio/Xcode on your machine (see `native/BUILD.md`).
 
-### Phase 3 — Realtime backend *(the Alfred unlock)*
-1. **Same-Gmail room** — both devices key a realtime channel by the Google user ID.
-2. **Remote live view** — WebRTC (P2P when possible) with a cheap relay fallback.
-3. **True push** (FCM/APNs) — motion/impact alerts land on the *viewer* device, with a snapshot.
-4. **Remote two-way talk** — mic on viewer → speaker on camera.
-5. **Walkie-talkie** — push-to-talk both directions over the same audio channel.
-6. **Remote siren** — trigger the alarm from the viewer phone.
-7. **Cloud clip sync** — clips visible from any paired device.
+### Phase 3 — Realtime backend *(the Alfred unlock)* ✅ CODE COMPLETE (needs your Supabase keys)
+1. ✅ **Room-based pairing** — shared room code (no Gmail dependency for the channel).
+2. ✅ **Remote live view** — WebRTC (STUN) + Supabase Realtime broadcast signaling.
+3. ✅ **Event push** — camera broadcasts motion/impact events to the viewer (in-app + Notification).
+4. ✅ **Remote two-way talk** — viewer mic track over WebRTC.
+5. ✅ **Walkie-talkie** — hold-to-talk on the viewer.
+6. ✅ **Remote siren** — viewer triggers the camera's siren.
+7. 🔶 **Cloud clip sync / TURN relay / FCM-APNs** — needs relay + backend edge function (Phase 5).
 
-### Phase 4 — Real ML
-1. **Person / vehicle detection** — MediaPipe object detector or TFLite YOLO-tiny.
-2. **License-plate OCR** — TFLite text model on vehicle detections.
-3. **Confidence + zone gating** to keep the AI timeline high-signal.
+### Phase 4 — Real ML ✅ SHIPPED
+1. ✅ **Person / vehicle detection** — TensorFlow.js COCO-SSD (on-device, CDN, lazy-loaded).
+2. ✅ **License-plate OCR** — Tesseract.js on vehicle crops (opt-in, throttled).
+3. ✅ **Confidence + zone gating** — >0.5 score filter; events throttled 12 s.
 
 ### Phase 5 — Hardening & polish
 1. Battery: charge-detection, low-battery auto-stop, low-voltage warning (accessory socket).

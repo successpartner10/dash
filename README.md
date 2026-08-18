@@ -31,8 +31,8 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 - **Low-power mode** — screen off, sensors still armed
 
 ### 🅿️ Parking mode
-- **Person detection** — AI recognition with live bounding boxes
-- **Vehicle detection** — with **license-plate capture**
+- **AI person/vehicle detection** — real on-device classification (TensorFlow.js COCO-SSD)
+- **License-plate OCR** — reads plates on detected vehicles (Tesseract)
 - **Impact detection** — accelerometer-based
 - **Motion zones** — tap any of the 9 zones to arm / disarm (gates the real camera, not just the demo)
 - **Night mode** — low-light boost for dark rooms (live + burned into recordings)
@@ -41,9 +41,9 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 - **Digital zoom** — pinch / drag / mouse-wheel zoom on the live view
 - **Arm/disarm schedules** — auto-arm by time of day (overnight windows supported)
 - **Privacy mode** — auto-pause monitoring within 250 m of home
-- **Live remote video** — stream the view from anywhere
+- **Live remote video** — stream the view from your other phone (Supabase + WebRTC)
 - **Two-way talk** — speak through the camera
-- **Push notifications** — person / impact alerts
+- **Remote siren & push events** — sound the alarm / receive alerts on the viewer phone
 - **Cloud event clips** — protected moments auto-uploaded to **Google Drive** (real, with Gmail sign-in)
 
 ### ✨ AI event timeline (the killer feature)
@@ -187,7 +187,7 @@ Settings persist in `localStorage` (with an in-memory fallback for sandboxed pre
 |---|---|---|
 | Video | Simulated canvas render | ✅ real camera stream |
 | GPS / speed | Simulated | ✅ real `geolocation` |
-| Person / vehicle / impact detection | Scripted scenario + drawn entities | ✅ real frame-diff **motion** detection (blob boxes) |
+| Person / vehicle / impact detection | Scripted scenario + drawn entities | ✅ real — AI classification (COCO-SSD) + frame-diff fallback |
 | Loop recording | Simulated counter | ✅ real `MediaRecorder`, **persisted to OPFS** |
 | Audio in footage | — | ✅ real (on/off toggle) |
 | Burned-in timestamp/speed/GPS | — | ✅ drawn into the video via canvas composite |
@@ -195,8 +195,44 @@ Settings persist in `localStorage` (with an in-memory fallback for sandboxed pre
 | Storage meter | Simulated | ✅ real `navigator.storage.estimate()` usage/quota |
 | License-plate capture | Simulated plate strings | ⚠️ needs on-device OCR (see roadmap) |
 | Cloud upload | Simulated until you connect Drive | ✅ **real Google Drive upload** (needs your OAuth Client ID) — offline queue + auto-retry |
-| Push notifications | Browser notifications only | ⚠️ true push needs a backend (FCM/APNs) |
-| True background parking mode | n/a | ⚠️ needs a native wrapper |
+| Remote live view / talk / siren | n/a | ✅ real (WebRTC + Supabase Realtime — needs your free Supabase keys) |
+| Push notifications | Browser notifications only | 🔶 real between your phones via Supabase; platform FCM/APNs needs the native app |
+| True background parking mode | n/a | 🔶 native shell scaffolded (`native/`) — build the APK locally for foreground service |
+
+---
+
+## 🌐 Remote access (Supabase) — watch from your other phone
+
+The **Remote** tab turns your daily phone into a live viewer for the camera phone:
+
+1. **Camera phone** — Settings → **Remote access** → paste your free Supabase Project URL +
+   anon key → tap **Start broadcast** with a room code (e.g. `home-123`).
+2. **Viewer phone** — open the app, same keys → **Watch room** with the same code → the
+   **Remote** tab shows the live feed. **Hold to talk**, **Siren**, **Snapshot**, and a live
+   **event feed** (motion/impact alerts pushed from the camera).
+
+**Setup (2 minutes, free):**
+1. Create a project at **supabase.com**.
+2. **Settings → API** → copy the **Project URL** and **anon public key**.
+3. Paste both into the app → Save.
+
+No SQL or tables needed — it uses Supabase **Realtime broadcast channels** for signaling and
+**WebRTC** (STUN) for the video/audio. Keys stay in your browser, never sent anywhere but Supabase.
+
+> Honest note: P2P video can be blocked on some restrictive networks/carrier NATs. A TURN
+> relay (or Supabase Edge Function) removes that limit — on the roadmap.
+
+---
+
+## 📱 Native Android app (Capacitor)
+
+The `native/` folder wraps this same app into an installable Android APK with a
+**foreground sentry service** (camera keeps monitoring with the screen off). See
+**[native/BUILD.md](native/BUILD.md)**.
+
+```bash
+cd native && npm install && ./sync-web.sh && npx cap open android   # then Build APK in Android Studio
+```
 
 ---
 
