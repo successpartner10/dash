@@ -41,6 +41,9 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 - **Digital zoom** — pinch / drag / mouse-wheel zoom on the live view
 - **Arm/disarm schedules** — auto-arm by time of day (overnight windows supported)
 - **Privacy mode** — auto-pause monitoring within 250 m of home
+- **Battery monitoring** — live battery % + charging state; auto-stops recording below 15%
+- **Motion sensitivity** — Low / Medium / High threshold
+- **Smarter events** — enter → linger → leave narrative on the real feed
 - **Live remote video** — stream the view from your other phone (Supabase + WebRTC)
 - **Two-way talk** — speak through the camera
 - **Remote siren & push events** — sound the alarm / receive alerts on the viewer phone
@@ -164,7 +167,10 @@ Pages rebuilds automatically — the live URL is **https://successpartner10.gith
 | Parking | Vehicle detection | ✅ on |
 | Parking | Impact detection | ✅ on |
 | Parking | Motion zones | ✅ on |
-| Parking | License-plate capture | ✅ on |
+| Parking | AI detection (person/vehicle) | ✅ on |
+| Parking | Motion sensitivity | Medium |
+| Parking | Stop at low battery | ✅ on |
+| Parking | License-plate OCR | off |
 | Parking | Two-way talk | ✅ on |
 | Parking | Night mode | off |
 | Parking | Siren on detection | off |
@@ -193,7 +199,7 @@ Settings persist in `localStorage` (with an in-memory fallback for sandboxed pre
 | Burned-in timestamp/speed/GPS | — | ✅ drawn into the video via canvas composite |
 | G-sensor impact | Demo-triggered | ✅ real accelerometer (`devicemotion`) |
 | Storage meter | Simulated | ✅ real `navigator.storage.estimate()` usage/quota |
-| License-plate capture | Simulated plate strings | ⚠️ needs on-device OCR (see roadmap) |
+| License-plate capture | Simulated plate strings | ✅ real OCR on detected vehicles (Tesseract, opt-in) |
 | Cloud upload | Simulated until you connect Drive | ✅ **real Google Drive upload** (needs your OAuth Client ID) — offline queue + auto-retry |
 | Remote live view / talk / siren | n/a | ✅ real (WebRTC + Supabase Realtime — needs your free Supabase keys) |
 | Push notifications | Browser notifications only | 🔶 real between your phones via Supabase; platform FCM/APNs needs the native app |
@@ -219,8 +225,13 @@ The **Remote** tab turns your daily phone into a live viewer for the camera phon
 No SQL or tables needed — it uses Supabase **Realtime broadcast channels** for signaling and
 **WebRTC** (STUN) for the video/audio. Keys stay in your browser, never sent anywhere but Supabase.
 
-> Honest note: P2P video can be blocked on some restrictive networks/carrier NATs. A TURN
-> relay (or Supabase Edge Function) removes that limit — on the roadmap.
+> Honest note: P2P video can be blocked on some restrictive networks/carrier NATs. Add a
+> **TURN server** in Settings → Remote access (URL + optional username/credential) to relay
+> video when P2P is blocked — e.g. a free Coturn instance or a service like Metered/Open Relay.
+
+### Saved rooms (multi-camera)
+Each room you broadcast to or watch is remembered as a quick-join chip on the Remote tab —
+use a different room code per camera (e.g. `car-1`, `home-1`) and switch between them.
 
 ---
 

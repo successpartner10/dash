@@ -67,4 +67,16 @@ public class SentryPlugin extends Plugin {
             call.reject(t.getMessage(), t);
         }
     }
+
+    @PluginMethod
+    public void notify(PluginCall call) {
+        try {
+            String title = call.getString("title", "Smart Dash Cam");
+            String body = call.getString("body", "Event detected");
+            NotificationHelper.notify(getContext(), title, body);
+            call.resolve();
+        } catch (Throwable t) {
+            call.reject(t.getMessage(), t);
+        }
+    }
 }

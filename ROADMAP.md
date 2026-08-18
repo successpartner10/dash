@@ -114,11 +114,18 @@ GitHub Pages stays as the **front-end host**; it cannot do #2 by itself (static 
 2. ✅ **License-plate OCR** — Tesseract.js on vehicle crops (opt-in, throttled).
 3. ✅ **Confidence + zone gating** — >0.5 score filter; events throttled 12 s.
 
-### Phase 5 — Hardening & polish
-1. Battery: charge-detection, low-battery auto-stop, low-voltage warning (accessory socket).
-2. Heat: overheat auto-pause + guidance (phones in windshields are the #1 failure mode).
-3. Storage health: format/retention reminders, corrupted-segment skip.
-4. Multi-camera: manage several phones from one viewer account.
+### Phase 5 — Hardening & polish ✅ MOSTLY SHIPPED
+1. ✅ **Battery** — live battery % + charging state; auto-stops recording below 15% when not charging.
+2. 🔶 **Heat** — guidance only (web can't read thermals); native thermal API is a follow-up.
+3. ✅ **Storage health** — near-full (90%+) warnings; Drive 12 GB retention (Phase 0); OPFS loop cap.
+4. ✅ **Multi-camera** — saved room codes (quick-join chips); one room per camera.
+5. ✅ **TURN relay config** — paste a TURN URL/user/credential for reliable P2P-fallback video.
+6. ✅ **Local notifications (native)** — `NotificationHelper` + `Sentry.notify()` for on-device alerts.
+7. ✅ **Sensitivity controls** — Low/Medium/High motion threshold.
+8. ✅ **Smarter events** — enter → linger → leave presence state machine on the real feed.
+
+Remaining (need hardware/accounts, not buildable here): Android thermal auto-pause, FCM/APNs
+platform push, iOS background (not permitted by Apple), a hosted TURN service.
 
 ---
 

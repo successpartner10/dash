@@ -28,7 +28,7 @@ cd native/android && ./gradlew assembleDebug
 | File | Purpose |
 |---|---|
 | `SentryService.java` | Foreground service + persistent notification + PARTIAL_WAKE_LOCK |
-| `SentryPlugin.java` | JS bridge: `Sentry.start() / stop() / keepAwake() / ignoreBatteryOptimizations()` |
+| `SentryPlugin.java` | JS bridge: `Sentry.start() / stop() / keepAwake() / ignoreBatteryOptimizations() / notify()` |
 | `AndroidManifest.xml` | CAMERA, RECORD_AUDIO, location, FOREGROUND_SERVICE_CAMERA, POST_NOTIFICATIONS, WAKE_LOCK |
 | `MainActivity.java` | Registers `SentryPlugin` |
 

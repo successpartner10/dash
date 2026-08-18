@@ -328,6 +328,7 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
 
     <div class="top-status">
       <span class="pill"><span class="dot live" id="liveDot"></span><span id="liveTxt">LIVE</span></span>
+      <span class="pill" id="batteryPill" title="Battery"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="8" width="16" height="8" rx="2"/><path d="M21.5 11v2"/><rect x="5" y="10" width="9" height="4" fill="currentColor" stroke="none"/></svg> <span id="batteryTxt">—</span></span>
 
       <span class="pill" id="storePill"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.6" rx="7.2" ry="2.8"/><path d="M4.8 5.6v12.8c0 1.5 3.2 2.8 7.2 2.8s7.2-1.3 7.2-2.8V5.6"/><path d="M4.8 12c0 1.5 3.2 2.8 7.2 2.8s7.2-1.3 7.2-2.8"/></svg> <span id="storeTxt">12.4 GB</span></span>
       <button class="icon-btn" id="installBtn" style="display:none" title="Install app"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="2.8" width="13" height="18.4" rx="3"/><path d="M12 8v6.5M8.8 11.5 12 14.7l3.2-3.2"/></svg></button>
@@ -498,6 +499,7 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
         <div class="card">
           <h3>Remote status <span class="spacer" id="rtStatus"></span></h3>
           <p class="muted" id="rtInfo" style="margin:0;font-size:13px">Set up a free Supabase project and enter its keys in Settings → Remote access, then Start broadcast on the camera phone and Watch on this phone with the same room code.</p>
+          <div id="rtRooms"></div>
         </div>
       </div>
       <div class="col-events">
@@ -537,6 +539,9 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
         <label class="set-row"><span class="lb">Siren on detection<small>Loud alarm when a person/impact is detected while armed</small></span><span class="switch"><input type="checkbox" data-set="siren"><span class="tr"></span></span></label>
         <label class="set-row"><span class="lb">Sound-event detection<small>Trigger events on loud sounds (knocks, voices, glass)</small></span><span class="switch"><input type="checkbox" data-set="soundDetect" checked><span class="tr"></span></span></label>
         <label class="set-row"><span class="lb">AI detection (person/vehicle)<small>Real on-device classification (TensorFlow COCO-SSD, loads once)</small></span><span class="switch"><input type="checkbox" data-set="mlDetect" checked><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Motion sensitivity<small>How much motion triggers detection</small></span>
+          <select data-set="motionSense"><option>Low</option><option selected>Medium</option><option>High</option></select></label>
+        <label class="set-row"><span class="lb">Stop at low battery<small>Auto-stop recording below 15% when not charging</small></span><span class="switch"><input type="checkbox" data-set="lowBatteryStop" checked><span class="tr"></span></span></label>
         <label class="set-row"><span class="lb">License-plate OCR<small>Read plates on detected vehicles (Tesseract)</small></span><span class="switch"><input type="checkbox" data-set="mlPlate"><span class="tr"></span></span></label>
       </div>
 
@@ -547,6 +552,9 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
           <input type="text" id="supabaseUrlInput" placeholder="Supabase Project URL (https://xxxx.supabase.co)" autocomplete="off">
           <input type="text" id="supabaseKeyInput" placeholder="Anon public key" autocomplete="off">
           <input type="text" id="roomCodeInput" placeholder="Room code (e.g. home-123)" autocomplete="off">
+          <input type="text" id="turnUrlInput" placeholder="TURN server URL (optional, e.g. turn:relay.example.com:3478)" autocomplete="off">
+          <input type="text" id="turnUserInput" placeholder="TURN username (optional)" autocomplete="off">
+          <input type="text" id="turnCredInput" placeholder="TURN credential (optional)" autocomplete="off">
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn" id="rtSaveKeys">Save</button>
             <button class="btn primary" id="rtBroadcast">Start broadcast (camera)</button>
@@ -658,6 +666,8 @@ const S={
   talk:false, micOn:false,
   lastMotionEvent:0, lastImpact:0, armed:true, privacyActive:false, zoom:1, panX:0, panY:0,
   detections:[], lastDetEvent:0, lastPlate:null, lastPlateT:0, mlOn:false,
+  battery:{level:0.85, charging:false, supported:false},
+  dwellState:'none', dwellEnter:0, lingerAt:0, storageWarned:false, lowBatteryWarned:false,
   stream:null, rec:null, chunks:[], segments:[], protectedClips:[], protectNext:false,
   realUsage:0, realQuota:0,
 };
@@ -667,7 +677,8 @@ const settings=Object.assign({
   cloudUpload:true, notify:true, remoteVideo:true, lowPower:false, driveClientId:'',
   night:false, siren:false, soundDetect:true, scheduleOn:false, armTime:'22:00', disarmTime:'06:00', privacyOn:false, homeLat:null, homeLng:null,
   mlDetect:true, mlPlate:false,
-  supabaseUrl:'', supabaseKey:'', roomCode:'home-123',
+  motionSense:'Medium', lowBatteryStop:true,
+  supabaseUrl:'', supabaseKey:'', roomCode:'home-123', turnUrl:'', turnUser:'', turnCred:'', savedRooms:[],
 },(function(){try{return JSON.parse(store.getItem('sdc_settings')||'{}');}catch(e){return{};}})());
 
 let events=[];   // newest first
@@ -696,6 +707,7 @@ function addEvent(type,title,desc,extra){
   if(events.length>200)events.length=200;
   renderFeed(); renderTimeline(); updateStats();
   notify(e);
+  if((type==='person'||type==='impact')&&Native.ok){ Native.notify(title, desc); }
   if(typeof RT!=='undefined' && RT && RT.role==='camera' && RT.ch){ try{ RT.sendEvent({title,desc,time:e.time,sev:e.sev}); }catch(_){} }
   // cloud clips for impactful moments
   if(type==='impact' && settings.cloudUpload) pushClip('Protected — impact', true);
@@ -1016,6 +1028,10 @@ function updateHUD(){
   $('#storeTxt').textContent=fmtBytes(usedBytes);
   $('#liveDot').className='dot live';
   $('#liveTxt').textContent=(S.feed==='camera'?'LIVE · MY CAM':'DEMO · '+S.cam.toUpperCase());
+  const bp=$('#batteryPill'), bl=S.battery.level;
+  if(bp) bp.style.display=(S.battery.supported||S.feed==='demo')?'':'none';
+  const bt=$('#batteryTxt');
+  if(bt) bt.innerHTML=Math.round(bl*100)+'%'+(S.battery.charging?' <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true" style="vertical-align:-0.15em"><path d="M13 2 4.5 13.5H11L9.5 22 18 10.5H12z"/></svg>':'');
   $('#btnRec').classList.toggle('on',S.recording);
   $('#btnCamTxt').textContent=S.cam.toUpperCase();
   $('#talkBadge').style.display=(S.micOn||S.talk)?'':'none';
@@ -1394,7 +1410,7 @@ const Drive={
           renderClips(); this.refreshMeter(true); this.retentionSweep();
         }catch(e){
           item.uploading=false;
-          if(e&&e.notEnabled){ item.failed=true; toast('☁️ Enable the Google Drive API in your Cloud project (Library → Google Drive API → Enable), then retry'); }
+          if(e&&e.notEnabled){ item.failed=true; toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.2 4.2 0 0 1-.5-8.4A5.7 5.7 0 0 1 17.8 9.2 4.3 4.3 0 0 1 17 18z"/></svg> Enable the Google Drive API in your Cloud project (Library → Google Drive API → Enable), then retry'); }
           else{ item.attempts++; if(item.attempts>=this.MAX_ATTEMPTS){ item.failed=true; } else item.nextTry=Date.now()+this.backoff(item.attempts); }
           this.saveManifest();
         }
@@ -1469,12 +1485,12 @@ const Drive={
   },
   async list(){
     if(!this.connected) return [];
-    try{ await this.ensureFolder(); }catch(e){ if(e&&e.notEnabled) toast('☁️ Enable the Google Drive API in your Cloud project to list clips'); return []; }
+    try{ await this.ensureFolder(); }catch(e){ if(e&&e.notEnabled) toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.2 4.2 0 0 1-.5-8.4A5.7 5.7 0 0 1 17.8 9.2 4.3 4.3 0 0 1 17 18z"/></svg> Enable the Google Drive API in your Cloud project to list clips'); return []; }
     const q=encodeURIComponent("'"+this.folderId+"' in parents and trashed=false");
     try{
       const d=await this.api('GET','https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id,name,size,createdTime,mimeType)&orderBy=createdTime desc&pageSize=20');
       return d.files||[];
-    }catch(e){ if(e&&e.notEnabled) toast('☁️ Enable the Google Drive API in your Cloud project to list clips'); return []; }
+    }catch(e){ if(e&&e.notEnabled) toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.2 4.2 0 0 1-.5-8.4A5.7 5.7 0 0 1 17.8 9.2 4.3 4.3 0 0 1 17 18z"/></svg> Enable the Google Drive API in your Cloud project to list clips'); return []; }
   },
   async download(id,name){
     try{
@@ -1562,9 +1578,11 @@ const RT={
     const idle=$('#remoteIdle'); if(idle){ idle.style.display='grid'; }
     this.updateStatus();
   },
+  saveRoom(room){ if(!room) return; if(!settings.savedRooms.includes(room)){ settings.savedRooms.push(room); if(settings.savedRooms.length>6) settings.savedRooms.shift(); syncSetting('savedRooms'); } renderRooms(); },
   async startBroadcast(room){
     await this.stop();
     if(!(await this.init())) return;
+    this.saveRoom(room);
     this.role='camera'; this.room=room;
     if(S.stream&&S.stream.getVideoTracks().length) this.stream=S.stream;
     else{
@@ -1580,6 +1598,7 @@ const RT={
   async joinRoom(room){
     await this.stop();
     if(!(await this.init())) return;
+    this.saveRoom(room);
     this.role='viewer'; this.room=room;
     this.ch=this.channel(room);
     this.ch.on('broadcast',{event:'signal'},({payload})=>this.onSignal(payload));
@@ -1589,7 +1608,9 @@ const RT={
     toast('Joining room “'+room+'”…','ok');
   },
   async createPeer(){
-    const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+    const ice=[{urls:'stun:stun.l.google.com:19302'}];
+    if(settings.turnUrl){ ice.push({urls:settings.turnUrl, username:settings.turnUser||undefined, credential:settings.turnCred||undefined}); }
+    const pc=new RTCPeerConnection({iceServers:ice});
     pc.onicecandidate=e=>{ if(e.candidate) this.send({t:'ice', c:e.candidate}); };
     pc.ontrack=e=>{
       if(e.track.kind==='video'){
@@ -1697,7 +1718,26 @@ const Native={
   stop(){ if(this.ok){ try{ window.Capacitor.Plugins.Sentry.stop(); }catch(_){} } },
   keepAwake(){ if(this.ok){ try{ window.Capacitor.Plugins.Sentry.keepAwake(); }catch(_){} } },
   ignoreBattery(){ if(this.ok){ try{ window.Capacitor.Plugins.Sentry.ignoreBatteryOptimizations(); }catch(_){} } },
+  notify(title, body){ if(this.ok){ try{ window.Capacitor.Plugins.Sentry.notify({title:title, body:body}); }catch(_){} } },
 };
+
+/* saved room chips (Remote tab quick-join) */
+function renderRooms(){
+  const el=$('#rtRooms'); if(!el) return;
+  const rooms=settings.savedRooms||[];
+  if(!rooms.length){ el.innerHTML=''; return; }
+  el.innerHTML='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+rooms.map(r=>
+    '<button class="btn" data-room="'+esc(r)+'" style="padding:6px 12px;font-size:12px">'+esc(r)+'</button>'
+  ).join('')+'</div>';
+  el.querySelectorAll('[data-room]').forEach(b=>b.addEventListener('click',()=>{
+    const code=b.dataset.room;
+    const inp=$('#roomCodeInput'); if(inp) inp.value=code;
+    RT.joinRoom(code);
+    $$('#tabs button').forEach(x=>x.classList.remove('active'));
+    $$('#tabs button')[2].classList.add('active');
+    ['live','timeline','remote','settings'].forEach(v=>$('#view-'+v).classList.toggle('hidden',v!=='remote'));
+  }));
+}
 
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 let drivePoll=0;
@@ -1884,6 +1924,58 @@ function updateSentry(){
   else txt.innerHTML='<span style="color:#30d158">ARMED</span>'+(settings.siren?'<span style="color:#ff453a"> · SIREN</span>':'');
 }
 
+/* presence state machine — smarter events on the real feed:
+   person enters → lingers (6+ s) → leaves */
+function updatePresence(personPresent){
+  const now=performance.now();
+  if(personPresent){
+    if(S.dwellState==='none'){
+      S.dwellState='present'; S.dwellEnter=now;
+      addEvent('person','Person detected','A person was detected in a monitored zone while parked.',{});
+      if(settings.siren) playSiren();
+    } else if(S.dwellState==='present' && now-S.dwellEnter>6000){
+      S.dwellState='lingering'; S.lingerAt=now;
+      addEvent('person','Person lingering','Person has remained beside the vehicle for 6+ seconds.',{dur:'6 s'});
+    }
+  } else {
+    if(S.dwellState!=='none'){
+      addEvent('person','Person moved away','The person left the monitored area. No entry was detected.',{});
+      S.dwellState='none';
+    }
+  }
+}
+
+/* ---------- battery & storage health ---------- */
+function initBattery(){
+  try{
+    if(navigator.getBattery){
+      navigator.getBattery().then(b=>{
+        S.battery.supported=true; S.battery.level=b.level; S.battery.charging=b.charging;
+        const upd=()=>{S.battery.level=b.level; S.battery.charging=b.charging;};
+        try{ b.addEventListener('levelchange',upd); b.addEventListener('chargingchange',upd); }catch(_){}
+      }).catch(()=>{});
+    }
+  }catch(e){}
+}
+function monitorHealth(){
+  // storage nearly full
+  const pct=(S.feed==='camera'&&S.realQuota>0)?(S.realUsage/S.realQuota*100):(S.storage.used/S.storage.total*100);
+  if(pct>90 && !S.storageWarned){
+    S.storageWarned=true;
+    addEvent('system','Storage nearly full','Only '+Math.max(0,Math.round(100-pct))+'% free. Consider deleting old clips.',{});
+    toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.6" rx="7.2" ry="2.8"/><path d="M4.8 5.6v12.8c0 1.5 3.2 2.8 7.2 2.8s7.2-1.3 7.2-2.8V5.6"/></svg> Storage nearly full');
+  } else if(pct<=70){ S.storageWarned=false; }
+  // low battery auto-stop
+  const b=S.battery;
+  if(b.supported && !b.charging && b.level<=0.15 && S.recording && settings.lowBatteryStop){
+    if(!S.lowBatteryWarned){
+      S.lowBatteryWarned=true; stopRecording();
+      addEvent('system','Low battery — recording stopped','Battery at '+Math.round(b.level*100)+'%. Plug in to resume.',{});
+      toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="8" width="16" height="8" rx="2"/><path d="M21.5 11v2"/></svg> Low battery — recording stopped','crit');
+    }
+  } else if(b.level>0.25 || b.charging){ S.lowBatteryWarned=false; }
+}
+
 /* basic frame-diff motion detection */
 let motionCanvas, motionCtx, prevFrame=null, motionTick=0;
 /* ============================================================
@@ -1949,11 +2041,8 @@ const ML={
   emit(list){
     const t=performance.now();
     if(t-S.lastDetEvent<12000) return;
-    const p=list.find(d=>d.kind==='person');
     const veh=list.find(d=>d.kind==='vehicle');
-    if(p){ S.lastDetEvent=t; addEvent('person','Person detected','AI: person at '+p.conf+'% confidence while parked.',{});
-      if(settings.siren) playSiren(); }
-    else if(veh){ S.lastDetEvent=t; addEvent('vehicle','Vehicle detected','AI: '+veh.cls+' at '+veh.conf+'% confidence while parked.',{});
+    if(veh){ S.lastDetEvent=t; addEvent('vehicle','Vehicle detected','AI: '+veh.cls+' at '+veh.conf+'% confidence while parked.',{});
       if(settings.mlPlate) this.readPlate(veh); }
   },
   async readPlate(veh){
@@ -1988,6 +2077,7 @@ function detectMotion(){
   if(!S.armed||S.privacyActive){ S.motionBox=null; return; }
   const v=$('#video'); if(!v.videoWidth)return;
   if(++motionTick%6!==0)return;
+  const THRESH=settings.motionSense==='Low'?34:(settings.motionSense==='High'?20:26);
   motionCtx.drawImage(v,0,0,96,54);
   const d=motionCtx.getImageData(0,0,96,54).data;
   if(!prevFrame){prevFrame=new Uint8ClampedArray(d);return;}
@@ -1997,13 +2087,11 @@ function detectMotion(){
     const x=i%96, y=(i/96)|0;
     if(zonesOn){ const zr=Math.min(2,(y/18)|0), zc=Math.min(2,(x/32)|0); if(!S.zones[zr*3+zc]) continue; }
     const r=Math.abs(d[i*4]-prevFrame[i*4]),g=Math.abs(d[i*4+1]-prevFrame[i*4+1]),b=Math.abs(d[i*4+2]-prevFrame[i*4+2]);
-    if((r+g+b)/3>26){ if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;cnt++; }
+    if((r+g+b)/3>THRESH){ if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;cnt++; }
   }
   prevFrame.set(d);
   if(cnt>120){
     S.motionBox={x:minX/96*100,y:minY/54*100,w:(maxX-minX)/96*100,h:(maxY-minY)/54*100,conf:Math.min(98,Math.round(60+cnt/8))};
-    const t=performance.now();
-    if(t-S.lastMotionEvent>12000){S.lastMotionEvent=t; addEvent('person','Motion detected','Motion in an armed zone while parked. Clip recorded.',{}); if(settings.siren) playSiren();}
   } else S.motionBox=null;
 }
 /* loop recording (real) */
@@ -2078,6 +2166,17 @@ function frame(now){
     const v=$('#video');
     if(v&&v.videoWidth){ drawWatermarkFrame(v); }
     detectMotion(); ML.tick(v); updateBoxes();
+    if(S.mode==='parking'&&S.armed&&!S.privacyActive){
+      const personPresent=(S.detections&&S.detections.some(d=>d.kind==='person'))||!!S.motionBox;
+      updatePresence(personPresent);
+    } else if(S.dwellState!=='none'){ S.dwellState='none'; }
+  }
+  // battery + storage health monitoring
+  monitorHealth();
+  // demo battery simulation (only when the device has no real battery API)
+  if(S.feed==='demo'&&!S.battery.supported){
+    S.battery.charging=false;
+    S.battery.level=Math.max(0.04,S.battery.level-dt*0.00035);
   }
   // speed simulation (demo feed only — real camera uses GPS speed)
   if(S.mode==='driving'&&!S.lowPower&&S.feed==='demo'){
@@ -2169,6 +2268,7 @@ function bind(){
     $$('#tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
     ['live','timeline','remote','settings'].forEach(v=>$('#view-'+v).classList.toggle('hidden',v!==b.dataset.view));
     if(b.dataset.view==='timeline')renderTimeline();
+    if(b.dataset.view==='remote')renderRooms();
   }));
   $('#settingsBtn').addEventListener('click',()=>{$$('#tabs button').forEach(x=>x.classList.remove('active'));$$('#tabs button')[3].classList.add('active');
     ['live','timeline','remote','settings'].forEach(v=>$('#view-'+v).classList.toggle('hidden',v!=='settings'));});
@@ -2190,8 +2290,11 @@ function bind(){
     settings.supabaseUrl=($('#supabaseUrlInput').value||'').trim();
     settings.supabaseKey=($('#supabaseKeyInput').value||'').trim();
     settings.roomCode=($('#roomCodeInput').value||'home-123').trim();
+    settings.turnUrl=($('#turnUrlInput').value||'').trim();
+    settings.turnUser=($('#turnUserInput').value||'').trim();
+    settings.turnCred=($('#turnCredInput').value||'').trim();
     syncSetting('supabaseUrl'); RT.sb=null;
-    toast('Supabase keys saved','ok');
+    toast('Remote access settings saved','ok');
   });
   $('#rtBroadcast').addEventListener('click',()=>RT.startBroadcast(($('#roomCodeInput').value||settings.roomCode||'home-123').trim()));
   $('#rtWatch').addEventListener('click',()=>{
@@ -2305,6 +2408,10 @@ if(settings.driveClientId) driveInitPoll();
 { const u=$('#supabaseUrlInput'); if(u) u.value=settings.supabaseUrl||''; }
 { const k=$('#supabaseKeyInput'); if(k) k.value=settings.supabaseKey||''; }
 { const r=$('#roomCodeInput'); if(r) r.value=settings.roomCode||'home-123'; }
+{ const t=$('#turnUrlInput'); if(t) t.value=settings.turnUrl||''; }
+{ const tu=$('#turnUserInput'); if(tu) tu.value=settings.turnUser||''; }
+{ const tc=$('#turnCredInput'); if(tc) tc.value=settings.turnCred||''; }
+initBattery(); renderRooms();
 
 /* sentry runtime */
 initZoomControls();
