@@ -584,6 +584,7 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
             <span style="flex:1"></span>
             <button class="btn" id="driveConnectBtn"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15.5" r="4"/><path d="M11.2 12.3 20 3.5M16.5 7l3 3M13.5 10l2 2"/></svg> Sign in</button>
             <button class="btn danger" id="driveDisconnectBtn" style="display:none">Sign out</button>
+            <button class="btn" id="driveTestBtn">Test</button>
           </div>
           <input type="text" id="driveClientIdInput" placeholder="Paste your Google OAuth Client ID" autocomplete="off">
           <button class="btn" id="driveSaveIdBtn" style="align-self:flex-start">Save Client ID</button>
@@ -1535,6 +1536,41 @@ const Drive={
     try{store.removeItem('sdc_drive');}catch(_){}
     renderClips(); toast('Signed out of Google Drive');
   },
+  /* Full connection check — verifies every setup step and reports what passed/failed. */
+  async testConnection(){
+    const checks=[];
+    const step=(ok,name)=>{ checks.push({ok,name}); };
+    step(!!this.clientId,'Client ID configured');
+    if(!this.clientId){ toast('Add your Google OAuth Client ID first (Settings → Cloud)', ''); return; }
+    step(!!this.token,'Signed in to Google');
+    if(!this.token){ toast('Tap “Sign in” first, then “Test”'); return; }
+    step(typeof window!=='undefined'&&!!window.google,'Google Identity loaded');
+    try{
+      await this.ensureFolder();
+      step(true,'Drive folder “Smart Dash Cam”');
+    }catch(e){
+      step(false,'Drive API enabled + scope granted');
+      if(e&&e.notEnabled){ toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.2 4.2 0 0 1-.5-8.4A5.7 5.7 0 0 1 17.8 9.2 4.3 4.3 0 0 1 17 18z"/></svg> Drive API not enabled — Library → Google Drive API → Enable'); }
+      else if(/insufficient|scope|forbidden|permission/i.test(String(e&&e.message||''))){ toast('Scope missing — Google Auth Platform → Data Access → add drive.file'); }
+      else toast('Drive folder check failed: '+String(e&&e.message||'error').slice(0,90));
+    }
+    try{
+      const name='sdc-test-'+stamp()+'.txt';
+      const blob=new Blob(['Smart Dash Cam connection test'],{type:'text/plain'});
+      const f=await this.upload(name, blob, 'text/plain');
+      step(true,'Upload a test file');
+      try{ await this.deleteFile(f.id); }catch(_){}
+    }catch(e){
+      step(false,'Upload a test file');
+      if(e&&e.notEnabled){ toast('Drive API not enabled — enable it and re-test'); }
+      else toast('Upload test failed: '+String(e&&e.message||'error').slice(0,90));
+    }
+    const ok=checks.every(c=>c.ok);
+    const okI='<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7"/></svg>';
+    const badI='<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+    toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.2 4.2 0 0 1-.5-8.4A5.7 5.7 0 0 1 17.8 9.2 4.3 4.3 0 0 1 17 18z"/></svg> Drive check: '+checks.map(c=>(c.ok?okI:badI)+' '+c.name).join(' &nbsp; '), ok?'ok':'crit');
+    return {ok,checks};
+  },
 };
 /* ============================================================
    REALTIME — remote live view / talk / siren / push
@@ -2327,6 +2363,7 @@ function bind(){
   $('#useDemoBtn').addEventListener('click',useDemoFeed);
   $('#driveConnectBtn').addEventListener('click',()=>Drive.connect());
   $('#driveDisconnectBtn').addEventListener('click',()=>Drive.disconnect());
+  $('#driveTestBtn').addEventListener('click',()=>Drive.testConnection());
   $('#driveSaveIdBtn').addEventListener('click',()=>{
     const v=$('#driveClientIdInput').value.trim();
     settings.driveClientId=v; syncSetting('driveClientId');
