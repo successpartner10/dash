@@ -240,6 +240,11 @@ When connected, the cloud panel shows:
 
 ## 🛣️ Roadmap to a real product
 
+See **[ROADMAP.md](ROADMAP.md)** — the full two-track plan (dashcam vs. security-camera),
+feature status matrix, technical blockers, and the phase-by-phase build sequence.
+
+TL;DR:
+
 1. **Native app** — wrap this UI with [Capacitor](https://capacitorjs.com) (or rebuild in
    React Native / Flutter) for installable Android/iOS builds + background recording
    (Android foreground service + persistent notification).
