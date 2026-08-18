@@ -76,8 +76,8 @@ svg{display:inline-block;vertical-align:-0.16em;flex:none}
 @media(max-width:1020px){.grid{grid-template-columns:1fr}}
 
 /* ---------- camera ---------- */
-.camera{position:relative;background:#000;border:1px solid rgba(0,0,0,.08);border-radius:22px;overflow:hidden;
-  aspect-ratio:16/9;box-shadow:0 10px 30px rgba(0,0,0,.10)}
+.cam-wrap{background:var(--surface);border:1px solid rgba(0,0,0,.08);border-radius:22px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.10)}
+.camera{position:relative;background:#000;aspect-ratio:16/9;overflow:hidden}
 #feed,#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 100% at 50% 45%,transparent 55%,rgba(0,0,0,.5) 100%)}
 .scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.02) 0 1px,transparent 1px 3px)}
@@ -143,19 +143,20 @@ svg{display:inline-block;vertical-align:-0.16em;flex:none}
 .lowpower-veil .inner b{display:block;font-size:16px;color:#fff;margin-bottom:6px;font-family:var(--font-head);letter-spacing:.3px}
 .lowpower-veil .moon{font-size:34px;display:block;margin-bottom:10px;animation:bob 3s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-/* camera controls */
-.cam-controls{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:6}
-.cam-controls button{background:rgba(10,12,16,.5);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:980px;
-  padding:10px 16px;cursor:pointer;font-family:var(--font-head);font-weight:600;font-size:13px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  display:flex;align-items:center;gap:7px;transition:all .2s ease}
-.cam-controls button:hover{background:rgba(22,26,34,.62)}
-.cam-controls button.rec{color:#ff6961}
+/* camera controls — its own bar BELOW the video, never over the footage */
+.cam-controls{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;
+  padding:12px 14px;background:var(--surface);border-top:1px solid var(--line)}
+.cam-controls button{border:1px solid var(--line);background:var(--surface2);color:var(--text);border-radius:980px;
+  padding:9px 15px;cursor:pointer;font-family:var(--font-head);font-weight:600;font-size:13px;
+  display:inline-flex;align-items:center;gap:7px;transition:all .2s ease}
+.cam-controls button:hover{background:#eef0f4;border-color:var(--line2)}
+.cam-controls button.rec{color:var(--red);border-color:#ffd1cf;background:#fff}
 .cam-controls button.rec.on{background:var(--red);color:#fff;border-color:var(--red)}
 .cam-controls button.rec.on::before{content:"";width:7px;height:7px;border-radius:50%;background:#fff;animation:recpulse 1.2s infinite}
 @keyframes recpulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}70%{box-shadow:0 0 0 6px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
-.cam-controls button:active{transform:scale(.96)}
-.cam-controls .talk{color:#6ab7ff}
-.cam-controls .talk.holding{background:#0a84ff;color:#fff;border-color:#0a84ff}
+.cam-controls button:active{transform:scale(.97)}
+.cam-controls .talk{color:var(--teal)}
+.cam-controls .talk.holding{background:var(--teal);color:#fff;border-color:var(--teal)}
 
 /* ---------- cards ---------- */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
@@ -272,16 +273,14 @@ input[type=text],input[type=password]{background:var(--surface);color:var(--text
 input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3px rgba(0,0,0,.05)}
 /* ---------- responsive / anti-overlap ---------- */
 .top-status{flex-wrap:wrap;justify-content:flex-end;row-gap:8px}
-.cam-controls{width:max-content;max-width:calc(100% - 20px);flex-wrap:wrap;justify-content:center}
 .set-row > div{flex-wrap:wrap;gap:6px}
 @media(max-width:860px){
-  .cam-controls{max-width:calc(100% - 12px)}
   .cam-controls button{padding:9px 13px}
 }
 @media(max-width:760px){
   .hud .row.br{display:none}          /* storage mini-bar moves off the feed on small screens */
   .hud .speed2{font-size:16px}
-  .cam-controls{gap:6px;bottom:10px}
+  .cam-controls{gap:6px;padding:9px 10px}
   .cam-controls button{padding:8px 11px;font-size:12px;gap:6px}
   .set-row{flex-wrap:wrap}
   .set-row .lb{min-width:0}
@@ -341,6 +340,7 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
   <section id="view-live" class="view">
     <div class="grid">
       <div class="col-feed">
+        <div class="cam-wrap">
         <div class="camera" id="camera">
           <canvas id="feed" width="960" height="540"></canvas>
           <video id="video" playsinline autoplay muted style="display:none"></video>
@@ -386,8 +386,9 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
           </div>
 
           <div id="flash"></div>
+          </div>
 
-          <!-- controls -->
+          <!-- controls (below the video, never over it) -->
           <div class="cam-controls" id="camControls">
             <button id="btnRec" class="rec" title="Toggle loop recording"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="6.2"/></svg> REC</button>
             <button id="btnCam" title="Switch front/rear"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5h13.5l-3.2-3.2M20 15.5H6.5l3.2 3.2"/></svg> <span id="btnCamTxt">REAR</span></button>
