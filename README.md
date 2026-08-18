@@ -134,6 +134,8 @@ dash/
 ## 🚀 Deploy / update on GitHub
 
 The repo lives at `github.com/successpartner10/dash` and is published via **GitHub Pages**.
+New here? Start with **[SETUP.md](SETUP.md)** — a one-page checklist for the 3 keys (Drive,
+Supabase, TURN) that turn on the cloud features.
 
 ```bash
 git clone https://github.com/successpartner10/dash.git
