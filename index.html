@@ -258,7 +258,35 @@ small{font-size:12px}
 .qrow.fail .btn.danger{color:var(--red);border-color:#ffd1cf}
 input[type=text],input[type=password]{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-family:var(--font-body);font-size:13px;width:100%}
 input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3px rgba(0,0,0,.05)}
-
+/* ---------- responsive / anti-overlap ---------- */
+.top-status{flex-wrap:wrap;justify-content:flex-end;row-gap:8px}
+.cam-controls{width:max-content;max-width:calc(100% - 20px);flex-wrap:wrap;justify-content:center}
+.set-row > div{flex-wrap:wrap;gap:6px}
+@media(max-width:860px){
+  .cam-controls{max-width:calc(100% - 12px)}
+  .cam-controls button{padding:9px 13px}
+}
+@media(max-width:760px){
+  .hud .row.br{display:none}          /* storage mini-bar moves off the feed on small screens */
+  .hud .row.bl{bottom:88px}           /* lift speed/GPS clear of the wrapped controls */
+  .hud .speed{font-size:24px}
+  .cam-controls{gap:6px;bottom:10px}
+  .cam-controls button{padding:8px 11px;font-size:12px;gap:6px}
+  .set-row{flex-wrap:wrap}
+  .set-row .lb{min-width:0}
+}
+@media(max-width:520px){
+  .hud .row.tl .badge{display:none}   /* hide CAM chip, keep mode badge */
+  .hud .badge .k{font-size:8px}
+  .hud .speed{font-size:20px}
+  .hud .speed small{font-size:10px}
+  .cam-controls button{padding:7px 9px;font-size:11px;gap:5px}
+  #storePill{display:none}
+  #toasts{left:14px;right:14px;max-width:none}
+  .topbar{gap:10px}
+  .tabs button{padding:10px 12px;font-size:13px}
+  .modal .sheet{padding:24px}
+}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -283,7 +311,7 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
     <div class="top-status">
       <span class="pill"><span class="dot live" id="liveDot"></span><span id="liveTxt">LIVE</span></span>
       <span class="pill" id="recPill" style="display:none"><span class="dot rec"></span><span id="recTxt">REC 00:00</span></span>
-      <span class="pill"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.6" rx="7.2" ry="2.8"/><path d="M4.8 5.6v12.8c0 1.5 3.2 2.8 7.2 2.8s7.2-1.3 7.2-2.8V5.6"/><path d="M4.8 12c0 1.5 3.2 2.8 7.2 2.8s7.2-1.3 7.2-2.8"/></svg> <span id="storeTxt">12.4 GB</span></span>
+      <span class="pill" id="storePill"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.6" rx="7.2" ry="2.8"/><path d="M4.8 5.6v12.8c0 1.5 3.2 2.8 7.2 2.8s7.2-1.3 7.2-2.8V5.6"/><path d="M4.8 12c0 1.5 3.2 2.8 7.2 2.8s7.2-1.3 7.2-2.8"/></svg> <span id="storeTxt">12.4 GB</span></span>
       <button class="icon-btn" id="installBtn" style="display:none" title="Install app"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="2.8" width="13" height="18.4" rx="3"/><path d="M12 8v6.5M8.8 11.5 12 14.7l3.2-3.2"/></svg></button>
       <button class="icon-btn" id="lowPowerBtn" title="Low-power mode"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/></svg></button>
       <button class="icon-btn" id="settingsBtn" title="Settings"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15.5" cy="7" r="2.2"/><circle cx="8.5" cy="17" r="2.2"/></svg></button>
@@ -1152,7 +1180,7 @@ const Drive={
       try{ this.tokenClient.requestAccessToken(); await new Promise(res=>setTimeout(res,2500)); }catch(_){}
       r=await fetch(url,build());
     }
-    if(!r.ok){ const t=await r.text().catch(()=>''); throw new Error(t||('HTTP '+r.status)); }
+    if(!r.ok){ const t=await r.text().catch(()=>''); const e=new Error(t||('HTTP '+r.status)); if(/has not been used in project|it is disabled|Google Drive API/i.test(t)) e.notEnabled=true; throw e; }
     if(r.status===204) return {};
     return r.json();
   },
@@ -1171,7 +1199,7 @@ const Drive={
     fd.append('metadata', new Blob([JSON.stringify(meta)],{type:'application/json'}));
     fd.append('file', blob, name);
     const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,size',{method:'POST',headers:{Authorization:'Bearer '+this.token},body:fd});
-    if(!r.ok){ const t=await r.text().catch(()=>''); throw new Error(t||('HTTP '+r.status)); }
+    if(!r.ok){ const t=await r.text().catch(()=>''); const e=new Error(t||('HTTP '+r.status)); if(/has not been used in project|it is disabled|Google Drive API/i.test(t)) e.notEnabled=true; throw e; }
     return r.json();
   },
   async uploadClip(name, blob){
@@ -1244,9 +1272,9 @@ const Drive={
           toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.2 4.2 0 0 1-.5-8.4A5.7 5.7 0 0 1 17.8 9.2 4.3 4.3 0 0 1 17 18z"/></svg> Uploaded '+item.name,'ok');
           renderClips(); this.refreshMeter(true);
         }catch(e){
-          item.uploading=false; item.attempts++;
-          if(item.attempts>=this.MAX_ATTEMPTS){ item.failed=true; }
-          else item.nextTry=Date.now()+this.backoff(item.attempts);
+          item.uploading=false;
+          if(e&&e.notEnabled){ item.failed=true; toast('☁️ Enable the Google Drive API in your Cloud project (Library → Google Drive API → Enable), then retry'); }
+          else{ item.attempts++; if(item.attempts>=this.MAX_ATTEMPTS){ item.failed=true; } else item.nextTry=Date.now()+this.backoff(item.attempts); }
           this.saveManifest();
         }
         this.renderQueue();
@@ -1320,12 +1348,12 @@ const Drive={
   },
   async list(){
     if(!this.connected) return [];
-    try{ await this.ensureFolder(); }catch(e){ return []; }
+    try{ await this.ensureFolder(); }catch(e){ if(e&&e.notEnabled) toast('☁️ Enable the Google Drive API in your Cloud project to list clips'); return []; }
     const q=encodeURIComponent("'"+this.folderId+"' in parents and trashed=false");
     try{
       const d=await this.api('GET','https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id,name,size,createdTime,mimeType)&orderBy=createdTime desc&pageSize=20');
       return d.files||[];
-    }catch(e){ return []; }
+    }catch(e){ if(e&&e.notEnabled) toast('☁️ Enable the Google Drive API in your Cloud project to list clips'); return []; }
   },
   async download(id,name){
     try{
