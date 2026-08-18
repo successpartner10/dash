@@ -1,5 +1,5 @@
 /* Smart Dash Cam — service worker (offline + installable PWA) */
-const CACHE = 'sdc-v1';
+const CACHE = 'sdc-v2';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-180.png'];
 
 self.addEventListener('install', (e) => {

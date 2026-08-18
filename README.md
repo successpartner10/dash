@@ -47,9 +47,16 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 - **Copy-to-clipboard export** of the whole timeline
 
 ### 📱 PWA (installable app)
-- **Install to your home screen** — tap 📲 (or the browser's "Install app" prompt)
+- **Install to your home screen** — tap the install icon (or the browser's "Install app" prompt)
 - **Full-screen standalone** mode, own icon & splash color
 - **Offline** — a service worker caches the app so it opens with no connection
+
+### 🎨 Design
+- Clean, modern **Apple-style** interface — light surfaces, generous spacing, soft shadows,
+  pill buttons and segmented controls.
+- Typography: **Montserrat** (headings, labels, buttons) + **Raleway** (body) via Google Fonts.
+- Crisp **inline SVG icons** throughout (no emoji) — traffic, camera, shield, cloud, settings…
+- Dark frosted-glass HUD overlays the live camera feed, iOS-style.
 
 ---
 
