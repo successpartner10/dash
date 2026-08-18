@@ -183,6 +183,7 @@ OLD PHONE (camera)                        DAILY PHONE (viewer)
 |---|---|
 | Camera shows demo, not real | Use the **github.io URL in the address bar**; tap Allow |
 | "Access blocked / app not verified" | Add your Gmail under **Test users** (B3, Audience tab) |
+| "No registered origin" / "origin not registered" / redirect_uri_mismatch | Client's **Authorized JavaScript origins** must contain exactly `https://successpartner10.github.io` (no slash/www), **not** under redirect URIs, and you must be on the github.io URL (not a preview/localhost). Save, wait 1–2 min, retry. |
 | Drive upload fails | **Enable the Google Drive API** (B2) |
 | Drive sign-in popup won't open | Origins must be exactly `https://successpartner10.github.io` (B4, Clients tab); allow popups |
 | Remote: no video | Same room code both phones; camera broadcasting; add TURN (Part D) |
