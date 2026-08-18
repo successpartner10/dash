@@ -34,7 +34,13 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 - **Person detection** — AI recognition with live bounding boxes
 - **Vehicle detection** — with **license-plate capture**
 - **Impact detection** — accelerometer-based
-- **Motion zones** — tap any of the 9 zones to arm / disarm
+- **Motion zones** — tap any of the 9 zones to arm / disarm (gates the real camera, not just the demo)
+- **Night mode** — low-light boost for dark rooms (live + burned into recordings)
+- **Siren** — loud alarm on person/impact detection (and a manual Siren button)
+- **Sound-event detection** — mic-level spikes trigger events (knocks, voices, glass)
+- **Digital zoom** — pinch / drag / mouse-wheel zoom on the live view
+- **Arm/disarm schedules** — auto-arm by time of day (overnight windows supported)
+- **Privacy mode** — auto-pause monitoring within 250 m of home
 - **Live remote video** — stream the view from anywhere
 - **Two-way talk** — speak through the camera
 - **Push notifications** — person / impact alerts
@@ -160,6 +166,12 @@ Pages rebuilds automatically — the live URL is **https://successpartner10.gith
 | Parking | Motion zones | ✅ on |
 | Parking | License-plate capture | ✅ on |
 | Parking | Two-way talk | ✅ on |
+| Parking | Night mode | off |
+| Parking | Siren on detection | off |
+| Parking | Sound-event detection | ✅ on |
+| Sentry | Schedule arm/disarm | off |
+| Sentry | Arm / disarm at | 22:00 / 06:00 |
+| Sentry | Privacy pause at home | off |
 | Cloud | Upload event clips | ✅ on |
 | Cloud | Push notifications | ✅ on |
 | Cloud | Live remote video | ✅ on |

@@ -81,19 +81,17 @@ GitHub Pages stays as the **front-end host**; it cannot do #2 by itself (static 
 4. **Real accelerometer impact** — ✅ `devicemotion` shock detection → protect + event + upload
    (iOS motion permission requested on camera start).
 
-### Phase 1 — Security mode hardening *(stays web-only, no backend)*
-1. **Zones gate the real camera** — mask the frame-diff to armed zones only (ignore motion
-   outside armed cells); lower false positives from trees/cars passing.
-2. **Real impact detection** in parking mode (same `devicemotion` as Phase 0.4).
-3. **Smarter events** — enter/exit, "lingered N seconds" logic on the real feed (mirror the
-   demo's narrative events with real data).
-4. **Sensitivity controls that work** — motion threshold + zone size in Settings.
-5. **Night mode** — low-light boost (exposure/brightness/gamma) on the processed frame.
-6. **Siren (local)** — camera plays a loud alarm when person/impact is detected while armed.
-7. **Sound-event detection** — mic-level spikes trigger events (glass break, voices, knocks).
-8. **Digital zoom** — pinch/drag zoom on the live view.
-9. **Schedules** — auto arm/disarm by time (e.g. arm 22:00–06:00).
-10. **Privacy mode** — geofence/quick-toggle to stop monitoring when you're home.
+### Phase 1 — Security mode hardening *(web-only, no backend)* ✅ SHIPPED
+1. **Zones gate the real camera** — ✅ frame-diff masked to armed zones (3×3 grid).
+2. **Real impact detection** — ✅ `devicemotion` (shipped in Phase 0).
+3. **Smarter events** — 🔶 real events exist; enter/exit "lingered N seconds" narrative still demo-only.
+4. **Sensitivity controls** — 🔶 motion threshold is fixed; expose in Settings next.
+5. **Night mode** — ✅ low-light boost (brightness/contrast) live + burned into recordings.
+6. **Siren (local)** — ✅ Web Audio two-tone alarm on person/impact + manual Siren button.
+7. **Sound-event detection** — ✅ mic RMS spikes trigger events (throttled 15 s).
+8. **Digital zoom** — ✅ pinch / drag / mouse-wheel, 1–4×, double-tap reset.
+9. **Schedules** — ✅ auto arm/disarm by time, overnight windows supported.
+10. **Privacy mode** — ✅ geofence pause within 250 m of home ("Set home" button).
 
 ### Phase 2 — Native shell *(Capacitor)*
 1. Wrap the existing UI (single `index.html` ports cleanly).

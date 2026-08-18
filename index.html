@@ -126,7 +126,7 @@ svg{display:inline-block;vertical-align:-0.16em;flex:none}
 .plate-chip{position:absolute;bottom:-25px;left:-2px;background:rgba(10,12,16,.72);color:#ffd479;border:1px solid rgba(255,179,64,.5);
   font-family:var(--mono);font-weight:700;font-size:11px;padding:2px 7px;border-radius:6px;letter-spacing:2px}
 /* motion zones */
-.zones{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);pointer-events:none}
+.zones{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);pointer-events:none}
 .zone{pointer-events:auto;border:1px dashed rgba(255,255,255,.3);display:none;position:relative}
 .zones.on .zone{display:block}
 .zone .zl{position:absolute;top:4px;left:7px;font-family:var(--mono);font-weight:700;font-size:9px;color:rgba(255,255,255,.65);letter-spacing:1px}
@@ -157,6 +157,14 @@ svg{display:inline-block;vertical-align:-0.16em;flex:none}
 .cam-controls button:active{transform:scale(.97)}
 .cam-controls .talk{color:var(--teal)}
 .cam-controls .talk.holding{background:var(--teal);color:#fff;border-color:var(--teal)}
+/* night mode (low-light boost) */
+#video.night,#feed.night{filter:brightness(1.75) contrast(1.08) saturate(0.92)}
+/* digital zoom */
+#video,#feed{will-change:transform}
+.camera{touch-action:none}
+.cam-controls button.toggle.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+.cam-controls button.siren.on{background:var(--red);color:#fff;border-color:var(--red)}
+input[type=time]{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-family:var(--font-body);font-size:13px}
 
 /* ---------- cards ---------- */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
@@ -362,6 +370,9 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
                 <div class="hline" id="parkBadge" style="display:none"><span class="k">DETECT</span><span class="v" id="detectVal">person · vehicle · impact</span></div>
               </div>
             </div>
+            <div class="row bl" style="flex-direction:column">
+              <div class="badge" id="sentryBadge" style="display:none"><span class="k">SENTRY</span><span class="v" id="sentryTxt">ARMED</span></div>
+            </div>
             <div class="row br" style="flex-direction:column;align-items:flex-end">
               <div class="badge" id="talkBadge" style="display:none">
                 <span class="k">LIVE AUDIO</span>
@@ -395,6 +406,8 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
             <button id="btnCam" title="Switch front/rear"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5h13.5l-3.2-3.2M20 15.5H6.5l3.2 3.2"/></svg> <span id="btnCamTxt">REAR</span></button>
             <button id="btnSnap" title="Snapshot"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6.8" width="18" height="13.4" rx="3"/><circle cx="12" cy="13.5" r="3.8"/><path d="M8.2 6.8 9.8 4.4h4.4l1.6 2.4"/></svg></button>
             <button id="btnProtect" title="Protect current footage"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 19 5.8v5.4c0 4.6-3 7.7-7 9.3-4-1.6-7-4.7-7-9.3V5.8z"/></svg> Protect</button>
+            <button id="btnNight" class="toggle" title="Night mode (low-light boost)"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/></svg> Night</button>
+            <button id="btnSiren" class="siren" title="Siren alarm" style="display:none"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a4.5 4.5 0 0 1 0 7"/><path d="M19 6a8 8 0 0 1 0 12"/></svg> Siren</button>
             <button id="btnZones" title="Motion zones" style="display:none"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.2" y="3.2" width="7" height="7" rx="1.6"/><rect x="13.8" y="3.2" width="7" height="7" rx="1.6"/><rect x="3.2" y="13.8" width="7" height="7" rx="1.6"/><rect x="13.8" y="13.8" width="7" height="7" rx="1.6"/></svg> Zones</button>
             <button id="btnTalk" class="talk" title="Two-way talk" style="display:none"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8.8" y="2.8" width="6.4" height="11" rx="3.2"/><path d="M5 11.5a7 7 0 0 0 14 0"/><path d="M12 18.5V21"/></svg> Talk</button>
           </div>
@@ -486,6 +499,18 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
         <label class="set-row"><span class="lb">Motion zones<small>Only monitor armed zones</small></span><span class="switch"><input type="checkbox" data-set="zonesOn" checked><span class="tr"></span></span></label>
         <label class="set-row"><span class="lb">License-plate capture<small>Auto-capture on vehicle events</small></span><span class="switch"><input type="checkbox" data-set="plateCap" checked><span class="tr"></span></span></label>
         <label class="set-row"><span class="lb">Two-way talk<small>Speak through the camera</small></span><span class="switch"><input type="checkbox" data-set="twoWay" checked><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Night mode<small>Low-light boost for dark rooms</small></span><span class="switch"><input type="checkbox" data-set="night"><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Siren on detection<small>Loud alarm when a person/impact is detected while armed</small></span><span class="switch"><input type="checkbox" data-set="siren"><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Sound-event detection<small>Trigger events on loud sounds (knocks, voices, glass)</small></span><span class="switch"><input type="checkbox" data-set="soundDetect" checked><span class="tr"></span></span></label>
+      </div>
+
+      <div class="set-group">
+        <h3>Sentry &amp; privacy</h3>
+        <label class="set-row"><span class="lb">Schedule arm/disarm<small>Auto-arm by time of day</small></span><span class="switch"><input type="checkbox" data-set="scheduleOn"><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Arm at<small>e.g. 22:00</small></span><input type="time" data-set="armTime" value="22:00"></label>
+        <label class="set-row"><span class="lb">Disarm at<small>e.g. 06:00</small></span><input type="time" data-set="disarmTime" value="06:00"></label>
+        <label class="set-row"><span class="lb">Privacy pause at home<small>Stop monitoring within 250 m of home</small></span><span class="switch"><input type="checkbox" data-set="privacyOn"><span class="tr"></span></span></label>
+        <label class="set-row"><span class="lb">Home location<small>Uses your current GPS position</small></span><button class="btn" id="setHomeBtn">Set home</button></label>
       </div>
 
       <div class="set-group">
@@ -578,7 +603,7 @@ const S={
   impactT:0,
   flashT:0,
   talk:false, micOn:false,
-  lastMotionEvent:0, lastImpact:0,
+  lastMotionEvent:0, lastImpact:0, armed:true, privacyActive:false, zoom:1, panX:0, panY:0,
   stream:null, rec:null, chunks:[], segments:[], protectedClips:[], protectNext:false,
   realUsage:0, realQuota:0,
 };
@@ -586,6 +611,7 @@ const settings=Object.assign({
   autoStart:true, loopLen:'3 min', quality:'1080p FHD', gSense:'Medium', protectBrake:true, recordAudio:true,
   detPerson:true, detVehicle:true, detImpact:true, plateCap:true, twoWay:true,
   cloudUpload:true, notify:true, remoteVideo:true, lowPower:false, driveClientId:'',
+  night:false, siren:false, soundDetect:true, scheduleOn:false, armTime:'22:00', disarmTime:'06:00', privacyOn:false, homeLat:null, homeLng:null,
 },(function(){try{return JSON.parse(store.getItem('sdc_settings')||'{}');}catch(e){return{};}})());
 
 let events=[];   // newest first
@@ -704,6 +730,7 @@ function realImpact(g){
   S.impactT=0.9; S.flashT=0.35;
   addEvent('impact','Impact detected','Accelerometer shock of '+g.toFixed(1)+' g. Clip protected.',{protect:true});
   if(S.feed==='camera') protectSegment();
+  if(settings.siren) playSiren();
 }
 function triggerImpact(label){
   S.impactT=0.9; S.flashT=0.35;
@@ -887,8 +914,6 @@ function setMode(m){
   mb.className='mode-badge '+(m==='driving'?'driving':'parking');
   $('#speedBadge').style.display=m==='driving'?'':'none';
   $('#parkBadge').style.display=m==='parking'?'':'none';
-  $('#btnZones').style.display=m==='parking'&&S.feed==='demo'?'':'none';
-  $('#btnTalk').style.display=m==='parking'&&settings.twoWay?'':'none';
   $('#zones').classList.toggle('on',m==='parking'&&S.zonesOn);
   if(m==='parking') addEvent('system','Parking mode active','Sensors armed — monitoring person, vehicle and impact zones.');
   else addEvent('system','Driving mode active','GPS + speed overlay on. Loop recording will start automatically.');
@@ -926,6 +951,15 @@ function updateHUD(){
   $('#btnCamTxt').textContent=S.cam.toUpperCase();
   $('#talkBadge').style.display=(S.micOn||S.talk)?'':'none';
   $('#lpVeil').classList.toggle('on',S.lowPower);
+  $('#btnNight').classList.toggle('on',settings.night);
+  $('#btnSiren').classList.toggle('on',sirenActive);
+  $('#btnNight').style.display='';
+  $('#btnSiren').style.display=S.mode==='parking'?'':'none';
+  $('#btnZones').style.display=S.mode==='parking'?'':'none';
+  $('#btnTalk').style.display=(S.mode==='parking'&&settings.twoWay)?'':'none';
+  $('#video').classList.toggle('night',settings.night);
+  $('#feed').classList.toggle('night',settings.night);
+  updateSentry();
   updateDetectVal();
 }
 
@@ -994,7 +1028,7 @@ async function enableCamera(){
     S.feed='camera';
     v.style.display='block'; feedCanvas.style.display='none';
     const wm=$('#wm'); if(wm) wm.style.display='block';
-    startMotionDetect(); startGPS();
+    startMotionDetect(); startGPS(); stopSoundDetect(); startSoundDetect(stream);
     toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6.8" width="18" height="13.4" rx="3"/><circle cx="12" cy="13.5" r="3.8"/><path d="M8.2 6.8 9.8 4.4h4.4l1.6 2.4"/></svg> Live camera active — you\u2019re streaming','ok');
   }catch(e){
     if(S.stream){try{S.stream.getTracks().forEach(t=>t.stop());}catch(_){} S.stream=null;}
@@ -1032,7 +1066,7 @@ function useDemoFeed(){
   stopGPS();
   S.feed='demo'; $('#video').style.display='none'; feedCanvas.style.display='block';
   const wm=$('#wm'); if(wm) wm.style.display='none';
-  S.motionBox=null; stopRecording(); toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M10 8.8 16 12l-6 3.2z"/></svg> Demo feed active','ok'); updateHUD();
+  S.motionBox=null; stopRecording(); stopSoundDetect(); toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M10 8.8 16 12l-6 3.2z"/></svg> Demo feed active','ok'); updateHUD();
 }
 /* ============================================================
    REAL PERSISTENT STORAGE (Origin Private File System)
@@ -1437,7 +1471,9 @@ function drawWatermarkFrame(v){
   ensureWM(v);
   if(!v.videoWidth||!v.videoHeight) return;
   const W=wmCanvas.width, H=wmCanvas.height;
+  try{ wmCtx.filter = settings.night ? 'brightness(1.75) contrast(1.08) saturate(0.92)' : 'none'; }catch(_){}
   wmCtx.drawImage(v,0,0,W,H);
+  try{ wmCtx.filter='none'; }catch(_){}
   const fs=Math.max(14,Math.round(W/46));
   const pad=Math.round(fs*0.7), lh=Math.round(fs*1.35);
   const line1=fmtClock(new Date())+'   '+new Date().toLocaleDateString('en-CA');
@@ -1460,6 +1496,145 @@ function drawWatermarkFrame(v){
   }
 }
 
+/* ============================================================
+   SENTRY — siren, sound detection, digital zoom, schedule, privacy
+   ============================================================ */
+let sirenActive=false, sirenCtx=null;
+function getAudioCtx(){
+  try{
+    if(!sirenCtx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return null; sirenCtx=new AC(); }
+    if(sirenCtx.state==='suspended') sirenCtx.resume().catch(()=>{});
+    return sirenCtx;
+  }catch(e){ return null; }
+}
+function playSiren(){
+  const ac=getAudioCtx(); if(!ac) return;
+  try{
+    sirenActive=true;
+    const t0=ac.currentTime;
+    const osc=ac.createOscillator(), g=ac.createGain();
+    osc.type='sine'; g.gain.value=0.0001;
+    osc.connect(g); g.connect(ac.destination);
+    const sweep=()=>{
+      const c=ac.currentTime-t0;
+      if(c>6){ try{osc.stop();}catch(_){} sirenActive=false; return; }
+      const ph=(c*0.6)%1;
+      osc.frequency.value=800+400*(ph<0.5?ph*2:2-ph*2);
+      requestAnimationFrame(sweep);
+    };
+    g.gain.setValueAtTime(0.0001,t0);
+    g.gain.exponentialRampToValueAtTime(0.25,t0+0.05);
+    g.gain.setValueAtTime(0.25,t0+5.5);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+6);
+    osc.start(t0); sweep();
+    toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a4.5 4.5 0 0 1 0 7"/></svg> Siren sounding','crit');
+  }catch(e){ sirenActive=false; }
+}
+function stopSiren(){ if(sirenCtx){ try{sirenCtx.close().catch(()=>{});}catch(_){} } sirenCtx=null; sirenActive=false; }
+
+/* sound-event detection (mic level spikes) */
+let soundAnalyser=null, soundSrc=null;
+function startSoundDetect(stream){
+  if(!settings.soundDetect) return;
+  try{
+    const ac=getAudioCtx(); if(!ac) return;
+    const tracks=stream.getAudioTracks();
+    if(!tracks.length) return;
+    if(soundSrc){ try{soundSrc.disconnect();}catch(_){} }
+    soundSrc=ac.createMediaStreamSource(new MediaStream(tracks));
+    soundAnalyser=ac.createAnalyser(); soundAnalyser.fftSize=512;
+    soundSrc.connect(soundAnalyser);
+  }catch(e){}
+}
+function stopSoundDetect(){ if(soundSrc){try{soundSrc.disconnect();}catch(_){}} soundSrc=null; soundAnalyser=null; }
+let lastSoundEvent=0;
+function pollSound(){
+  if(!soundAnalyser||S.mode!=='parking'||!S.armed||S.privacyActive) return;
+  const buf=new Uint8Array(soundAnalyser.fftSize);
+  soundAnalyser.getByteTimeDomainData(buf);
+  let sum=0; for(let i=0;i<buf.length;i++){const v=buf[i]-128; sum+=v*v;}
+  const rms=Math.sqrt(sum/buf.length)/128;
+  if(rms>0.55){
+    const t=Date.now();
+    if(t-lastSoundEvent>15000){ lastSoundEvent=t; addEvent('system','Sound detected','A loud sound was heard near the vehicle while parked.',{}); if(settings.siren) playSiren(); }
+  }
+}
+
+/* digital zoom (pinch + drag + wheel) */
+function applyZoom(){
+  const t='translate('+S.panX+'px,'+S.panY+'px) scale('+S.zoom+')';
+  const v=$('#video'), f=$('#feed');
+  if(v) v.style.transform=t; if(f) f.style.transform=t;
+}
+let zoomPointers={}, zoomPrev=0;
+function initZoomControls(){
+  const cam=$('#camera'); if(!cam) return;
+  cam.addEventListener('pointerdown',e=>{
+    zoomPointers[e.pointerId]={x:e.clientX,y:e.clientY};
+    const ks=Object.keys(zoomPointers);
+    if(ks.length===2){ const p=ks.map(k=>zoomPointers[k]); zoomPrev=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y); }
+    try{ cam.setPointerCapture(e.pointerId); }catch(_){}
+  });
+  cam.addEventListener('pointermove',e=>{
+    if(!zoomPointers[e.pointerId]) return;
+    const ks=Object.keys(zoomPointers);
+    if(ks.length===2){
+      const a=zoomPointers[ks[0]], b=zoomPointers[ks[1]];
+      const d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(zoomPrev>0){ S.zoom=Math.min(4,Math.max(1,S.zoom*(d/zoomPrev))); }
+      zoomPrev=d; clampPan(); applyZoom();
+    } else if(ks.length===1 && S.zoom>1){
+      const p=zoomPointers[ks[0]]; const dx=e.clientX-p.x, dy=e.clientY-p.y;
+      S.panX+=dx; S.panY+=dy;
+      zoomPointers[e.pointerId]={x:e.clientX,y:e.clientY}; clampPan(); applyZoom();
+    } else { zoomPointers[e.pointerId]={x:e.clientX,y:e.clientY}; }
+  });
+  const end=e=>{ delete zoomPointers[e.pointerId]; if(Object.keys(zoomPointers).length<2) zoomPrev=0; };
+  cam.addEventListener('pointerup',end);
+  cam.addEventListener('pointercancel',end);
+  cam.addEventListener('wheel',e=>{ e.preventDefault(); S.zoom=Math.min(4,Math.max(1,S.zoom*(e.deltaY<0?1.15:0.87))); clampPan(); applyZoom(); },{passive:false});
+  cam.addEventListener('dblclick',()=>{ S.zoom=1; S.panX=0; S.panY=0; applyZoom(); });
+}
+function clampPan(){
+  const el=$('#camera'); if(!el) return;
+  const w=el.clientWidth||960, h=el.clientHeight||540;
+  const mx=(S.zoom-1)/2*w, my=(S.zoom-1)/2*h;
+  S.panX=Math.max(-mx,Math.min(mx,S.panX));
+  S.panY=Math.max(-my,Math.min(my,S.panY));
+}
+
+/* schedule + privacy */
+function parseHM(t){ if(!t) return NaN; const p=String(t).split(':'); const h=parseInt(p[0],10), m=parseInt(p[1],10); if(isNaN(h)||isNaN(m)) return NaN; return h*60+m; }
+function isArmedNow(){
+  if(!settings.scheduleOn) return true;
+  const now=new Date(); const mins=now.getHours()*60+now.getMinutes();
+  const a=parseHM(settings.armTime), d=parseHM(settings.disarmTime);
+  if(isNaN(a)||isNaN(d)||a===d) return true;
+  if(a<d) return mins>=a && mins<d;   // same-day window
+  return mins>=a || mins<d;           // overnight window
+}
+function distM(lat1,lon1,lat2,lon2){
+  const R=6371000, toRad=Math.PI/180;
+  const dLat=(lat2-lat1)*toRad, dLon=(lon2-lon1)*toRad;
+  const a=Math.sin(dLat/2)**2 + Math.cos(lat1*toRad)*Math.cos(lat2*toRad)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function isNearHome(){
+  if(!settings.privacyOn||settings.homeLat==null||settings.homeLng==null) return false;
+  return distM(S.gps.lat,S.gps.lng,settings.homeLat,settings.homeLng) < 250;
+}
+function updateSentry(){
+  const badge=$('#sentryBadge'), txt=$('#sentryTxt');
+  if(!badge||!txt) return;
+  if(S.mode!=='parking'){ badge.style.display='none'; return; }
+  S.armed=isArmedNow();
+  S.privacyActive=isNearHome();
+  badge.style.display='';
+  if(S.privacyActive) txt.innerHTML='<span style="color:#0a84ff">PRIVACY · HOME</span>';
+  else if(!S.armed) txt.innerHTML='<span style="color:#ff9f0a">DISARMED (schedule)</span>';
+  else txt.innerHTML='<span style="color:#30d158">ARMED</span>'+(settings.siren?'<span style="color:#ff453a"> · SIREN</span>':'');
+}
+
 /* basic frame-diff motion detection */
 let motionCanvas, motionCtx, prevFrame=null, motionTick=0;
 function startMotionDetect(){
@@ -1468,21 +1643,25 @@ function startMotionDetect(){
 }
 function detectMotion(){
   if(S.feed!=='camera'||S.mode!=='parking'||S.lowPower||!motionCanvas)return;
+  if(!S.armed||S.privacyActive){ S.motionBox=null; return; }
   const v=$('#video'); if(!v.videoWidth)return;
   if(++motionTick%6!==0)return;
   motionCtx.drawImage(v,0,0,96,54);
   const d=motionCtx.getImageData(0,0,96,54).data;
   if(!prevFrame){prevFrame=new Uint8ClampedArray(d);return;}
   let minX=96,minY=54,maxX=0,maxY=0,cnt=0;
+  const zonesOn=!!settings.zonesOn;
   for(let i=0;i<96*54;i++){
+    const x=i%96, y=(i/96)|0;
+    if(zonesOn){ const zr=Math.min(2,(y/18)|0), zc=Math.min(2,(x/32)|0); if(!S.zones[zr*3+zc]) continue; }
     const r=Math.abs(d[i*4]-prevFrame[i*4]),g=Math.abs(d[i*4+1]-prevFrame[i*4+1]),b=Math.abs(d[i*4+2]-prevFrame[i*4+2]);
-    if((r+g+b)/3>26){const x=i%96,y=(i/96)|0; if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;cnt++;}
+    if((r+g+b)/3>26){ if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;cnt++; }
   }
   prevFrame.set(d);
   if(cnt>120){
     S.motionBox={x:minX/96*100,y:minY/54*100,w:(maxX-minX)/96*100,h:(maxY-minY)/54*100,conf:Math.min(98,Math.round(60+cnt/8))};
     const t=performance.now();
-    if(t-S.lastMotionEvent>12000){S.lastMotionEvent=t; addEvent('person','Motion detected','Motion in monitored zone while parked. Clip recorded.',{});}
+    if(t-S.lastMotionEvent>12000){S.lastMotionEvent=t; addEvent('person','Motion detected','Motion in an armed zone while parked. Clip recorded.',{}); if(settings.siren) playSiren();}
   } else S.motionBox=null;
 }
 /* loop recording (real) */
@@ -1657,6 +1836,13 @@ function bind(){
   $('#btnSnap').addEventListener('click',snapshot);
   $('#btnProtect').addEventListener('click',()=>{addEvent('system','Footage protected','Current loop segment locked from overwrite.',{protect:true});
     if(S.feed==='camera'){ protectSegment(); } else { pushClip('Protected — manual',false); Drive.uploadSnapshot(); }});
+  $('#btnNight').addEventListener('click',()=>{ settings.night=!settings.night; syncSetting('night'); updateHUD(); });
+  $('#btnSiren').addEventListener('click',()=>{ sirenActive?stopSiren():playSiren(); });
+  $('#setHomeBtn').addEventListener('click',()=>{
+    if(S.gps.lat==null){ toast('No GPS fix yet'); return; }
+    settings.homeLat=S.gps.lat; settings.homeLng=S.gps.lng; syncSetting('homeLat');
+    toast('Home set to '+S.gps.lat.toFixed(4)+','+S.gps.lng.toFixed(4),'ok'); updateSentry();
+  });
   $('#btnZones').addEventListener('click',()=>{$('#zones').classList.toggle('on');S.zonesOn=$('#zones').classList.contains('on');toast(S.zonesOn?'Motion zones shown — tap to arm/disarm':'Motion zones hidden');});
   $('#btnTalk').addEventListener('click',toggleTalk);
   $('#btnTalk').addEventListener('pointerdown',e=>{e.preventDefault();$('#btnTalk').classList.add('holding');});
@@ -1709,6 +1895,7 @@ function bind(){
           const wasRec=S.recording; stopRecording();
           enableCamera().then(()=>{ if(wasRec&&settings.autoStart){ try{ startRealRecorder(); }catch(_){ S.recording=true; } } });
         }
+        if(k==='soundDetect'){ if(settings.soundDetect&&S.feed==='camera'&&S.stream) startSoundDetect(S.stream); else stopSoundDetect(); }
         updateDetectVal();
       });}
     else{el.value=settings[k];
@@ -1748,6 +1935,10 @@ FS.init().then(()=>{ refreshStorage(); setInterval(refreshStorage,15000); Drive.
 Drive.setClientId(settings.driveClientId||'');
 { const inp=$('#driveClientIdInput'); if(inp) inp.value=settings.driveClientId||''; }
 if(settings.driveClientId) driveInitPoll();
+
+/* sentry runtime */
+initZoomControls();
+setInterval(pollSound, 900);
 
 /* real accelerometer impact detection (devicemotion) */
 if(typeof window!=='undefined' && 'DeviceMotionEvent' in window){
