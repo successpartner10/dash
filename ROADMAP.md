@@ -90,6 +90,12 @@ GitHub Pages stays as the **front-end host**; it cannot do #2 by itself (static 
 3. **Smarter events** — enter/exit, "lingered N seconds" logic on the real feed (mirror the
    demo's narrative events with real data).
 4. **Sensitivity controls that work** — motion threshold + zone size in Settings.
+5. **Night mode** — low-light boost (exposure/brightness/gamma) on the processed frame.
+6. **Siren (local)** — camera plays a loud alarm when person/impact is detected while armed.
+7. **Sound-event detection** — mic-level spikes trigger events (glass break, voices, knocks).
+8. **Digital zoom** — pinch/drag zoom on the live view.
+9. **Schedules** — auto arm/disarm by time (e.g. arm 22:00–06:00).
+10. **Privacy mode** — geofence/quick-toggle to stop monitoring when you're home.
 
 ### Phase 2 — Native shell *(Capacitor)*
 1. Wrap the existing UI (single `index.html` ports cleanly).
@@ -100,11 +106,13 @@ GitHub Pages stays as the **front-end host**; it cannot do #2 by itself (static 
 5. Ship an **APK** (Android) + TestFlight **IPA** (iOS).
 
 ### Phase 3 — Realtime backend *(the Alfred unlock)*
-1. **Device pairing** — camera device shows a QR / code; viewer device scans it.
+1. **Same-Gmail room** — both devices key a realtime channel by the Google user ID.
 2. **Remote live view** — WebRTC (P2P when possible) with a cheap relay fallback.
-3. **True push** (FCM/APNs) — motion/impact alerts land on the *viewer* device.
+3. **True push** (FCM/APNs) — motion/impact alerts land on the *viewer* device, with a snapshot.
 4. **Remote two-way talk** — mic on viewer → speaker on camera.
-5. **Cloud clip sync** — clips visible from any paired device.
+5. **Walkie-talkie** — push-to-talk both directions over the same audio channel.
+6. **Remote siren** — trigger the alarm from the viewer phone.
+7. **Cloud clip sync** — clips visible from any paired device.
 
 ### Phase 4 — Real ML
 1. **Person / vehicle detection** — MediaPipe object detector or TFLite YOLO-tiny.
@@ -123,6 +131,7 @@ GitHub Pages stays as the **front-end host**; it cannot do #2 by itself (static 
 
 | Decision | Options | Notes |
 |---|---|---|
+| Identity model | Same Gmail · QR pairing code | Same Gmail first (matches Drive); pairing codes later for Trust Circle |
 | Backend | Supabase Realtime · Firebase · self-host | Supabase = quick + generous free tier; Firebase = FCM push built-in |
 | Monetization | Free · one-time · subscription (cloud clips) | Cloud storage is the natural paid tier |
 | Distribution | PWA + APK · Play Store · TestFlight | Play Store needs a dev account + privacy policy |
@@ -139,7 +148,7 @@ GitHub Pages stays as the **front-end host**; it cannot do #2 by itself (static 
 
 ---
 
-## 6. What "done" looks like
+## 8. What "done" looks like
 - **Dashcam done:** drives record with audio + burned-in evidence watermark, real G-sensor
   locking, and Drive retention keeps the folder ≤ ~12 GB automatically.
 - **Security done:** an old phone sits in a window, armed zones catch people/vehicles, sends a
