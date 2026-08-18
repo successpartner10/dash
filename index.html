@@ -2441,6 +2441,7 @@ bind(); buildZones(); updateHUD(); renderClips(); renderDigest(); updateStats();
 FS.init().then(()=>{ refreshStorage(); setInterval(refreshStorage,15000); Drive.restoreQueue().then(()=>Drive.processQueue()); });
 Drive.setClientId(settings.driveClientId||'');
 { const inp=$('#driveClientIdInput'); if(inp) inp.value=settings.driveClientId||''; }
+{ const oh=$('#originHint'); if(oh){ try{ oh.textContent='Detected origin: '+window.location.origin+' — this exact string must be in your Client\u2019s Authorized JavaScript origins'; }catch(_){} } }
 if(settings.driveClientId) driveInitPoll();
 { const u=$('#supabaseUrlInput'); if(u) u.value=settings.supabaseUrl||''; }
 { const k=$('#supabaseKeyInput'); if(k) k.value=settings.supabaseKey||''; }
