@@ -72,16 +72,14 @@ GitHub Pages stays as the **front-end host**; it cannot do #2 by itself (static 
 
 ## 3. Build sequence
 
-### Phase 0 — Dashcam quick wins *(finish the interrupted work — smallest, highest value)*
-1. **Record audio** — add `audio: true` to the camera constraints + an **Audio on/off** setting
-   (some jurisdictions regulate recording conversations — default **off** is the safe choice).
-2. **Burned-in watermark** — draw each frame to a canvas, paint
-   `2026-08-18 12:47:03 · 62 km/h · 43.653,-79.383`, record the canvas stream via
-   `canvas.captureStream()` + `MediaRecorder`. Note: ~30fps cap + extra CPU on phones.
-3. **Drive 12 GB retention rule** — track folder size; past 12 GB, when new footage adds
-   250 MB, delete the 500 MB of **oldest** clips (oldest-first, skip nothing in between).
-4. **Real accelerometer impact** — `devicemotion` magnitude spike → protect + event + upload.
-5. **Audio on/off toggle** (see #1) surfaced in Settings + stored.
+### Phase 0 — Dashcam quick wins ✅ SHIPPED
+1. **Record audio** — ✅ mic audio in footage, with an **Audio on/off** setting (Settings → Driving).
+2. **Burned-in watermark** — ✅ time · speed · GPS drawn into the video itself
+   (canvas `captureStream()` composite + `MediaRecorder`).
+3. **Drive 12 GB retention rule** — ✅ oldest-first deletion of ≥ 500 MB once past 12 GB
+   (adding ~250 MB frees ~500 MB), swept at most once per 2 min.
+4. **Real accelerometer impact** — ✅ `devicemotion` shock detection → protect + event + upload
+   (iOS motion permission requested on camera start).
 
 ### Phase 1 — Security mode hardening *(stays web-only, no backend)*
 1. **Zones gate the real camera** — mask the frame-diff to armed zones only (ignore motion

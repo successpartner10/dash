@@ -22,7 +22,9 @@ giving you 8 hours of video, its **AI timeline** tells you what actually mattere
 - **GPS + speed overlay** — real location & km/h from your device's GPS
 - **Loop recording** — 1 / 3 / 5 minute segments, oldest overwritten automatically
 - **Auto-start** — begins recording when power is applied / on launch
-- **Accident detection** — G-sensor impact detection + harsh-braking detection
+- **Accident detection** — real accelerometer impact detection + harsh-braking detection
+- **Record audio** — microphone audio in footage (on/off toggle)
+- **Burned-in timestamp** — time · speed · GPS watermark written into the video itself
 - **Protected footage** — clips locked from overwrite on impact
 - **Front / rear camera** switch
 - **Local storage meter** — real on-device usage & quota
@@ -175,6 +177,9 @@ Settings persist in `localStorage` (with an in-memory fallback for sandboxed pre
 | GPS / speed | Simulated | ✅ real `geolocation` |
 | Person / vehicle / impact detection | Scripted scenario + drawn entities | ✅ real frame-diff **motion** detection (blob boxes) |
 | Loop recording | Simulated counter | ✅ real `MediaRecorder`, **persisted to OPFS** |
+| Audio in footage | — | ✅ real (on/off toggle) |
+| Burned-in timestamp/speed/GPS | — | ✅ drawn into the video via canvas composite |
+| G-sensor impact | Demo-triggered | ✅ real accelerometer (`devicemotion`) |
 | Storage meter | Simulated | ✅ real `navigator.storage.estimate()` usage/quota |
 | License-plate capture | Simulated plate strings | ⚠️ needs on-device OCR (see roadmap) |
 | Cloud upload | Simulated until you connect Drive | ✅ **real Google Drive upload** (needs your OAuth Client ID) — offline queue + auto-retry |
@@ -225,6 +230,12 @@ When connected, the cloud panel shows:
 - **Google Drive storage** — your account's real usage vs. quota
   (`about.storageQuota`), rendered as a progress bar.
 - **This app's folder** — file count and total bytes in the “Smart Dash Cam” folder.
+
+### Drive retention (12 GB rule)
+The “Smart Dash Cam” folder is kept at **≤ 12 GB automatically**. Once the folder exceeds
+12 GB, every new upload triggers cleanup that deletes the **oldest** clips until at least
+**500 MB** is removed (so adding ~250 MB frees ~500 MB — the folder always shrinks back under
+the limit). Cleanup runs at most once every 2 minutes.
 
 ### Notes
 

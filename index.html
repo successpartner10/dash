@@ -344,6 +344,7 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
         <div class="camera" id="camera">
           <canvas id="feed" width="960" height="540"></canvas>
           <video id="video" playsinline autoplay muted style="display:none"></video>
+          <canvas id="wm" style="display:none"></canvas>
           <div class="scan"></div>
           <div class="vignette"></div>
 
@@ -473,6 +474,7 @@ input[type=text]:focus{border-color:var(--line2);outline:none;box-shadow:0 0 0 3
           <select data-set="quality"><option>720p HD</option><option selected>1080p FHD</option><option>1440p QHD</option></select></label>
         <label class="set-row"><span class="lb">G-sensor sensitivity<small>Impact detection threshold</small></span>
           <select data-set="gSense"><option>Low</option><option selected>Medium</option><option>High</option></select></label>
+        <label class="set-row"><span class="lb">Record audio<small>Include microphone audio in saved footage</small></span><span class="switch"><input type="checkbox" data-set="recordAudio" checked><span class="tr"></span></span></label>
         <label class="set-row"><span class="lb">Protect on harsh braking<small>Auto-lock clip when braking hard</small></span><span class="switch"><input type="checkbox" data-set="protectBrake" checked><span class="tr"></span></span></label>
       </div>
 
@@ -576,12 +578,12 @@ const S={
   impactT:0,
   flashT:0,
   talk:false, micOn:false,
-  lastMotionEvent:0,
+  lastMotionEvent:0, lastImpact:0,
   stream:null, rec:null, chunks:[], segments:[], protectedClips:[], protectNext:false,
   realUsage:0, realQuota:0,
 };
 const settings=Object.assign({
-  autoStart:true, loopLen:'3 min', quality:'1080p FHD', gSense:'Medium', protectBrake:true,
+  autoStart:true, loopLen:'3 min', quality:'1080p FHD', gSense:'Medium', protectBrake:true, recordAudio:true,
   detPerson:true, detVehicle:true, detImpact:true, plateCap:true, twoWay:true,
   cloudUpload:true, notify:true, remoteVideo:true, lowPower:false, driveClientId:'',
 },(function(){try{return JSON.parse(store.getItem('sdc_settings')||'{}');}catch(e){return{};}})());
@@ -695,6 +697,14 @@ const driveTimeline=[
   {at:16.0,run(){ triggerImpact('front collision detected'); }},
 ];
 
+function realImpact(g){
+  const now=Date.now();
+  if(now - S.lastImpact < 8000) return;
+  S.lastImpact = now;
+  S.impactT=0.9; S.flashT=0.35;
+  addEvent('impact','Impact detected','Accelerometer shock of '+g.toFixed(1)+' g. Clip protected.',{protect:true});
+  if(S.feed==='camera') protectSegment();
+}
 function triggerImpact(label){
   S.impactT=0.9; S.flashT=0.35;
   const e=addEvent('impact','Possible impact detected',label+'. Clip protected and queued for cloud upload. AI suggests reviewing the 30 s window around this event.',{protect:true});
@@ -975,13 +985,15 @@ function renderTimeline(){
 async function enableCamera(){
   try{
     if(!('mediaDevices' in navigator)||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw {name:'Unsupported'};
+    try{ if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){ DeviceMotionEvent.requestPermission().catch(()=>{}); } }catch(_){}
     const facing=S.cam==='front'?'user':'environment';
     if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stream=null;}
-    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:1280},frameRate:{ideal:30}},audio:false});
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:1280},frameRate:{ideal:30}},audio:!!settings.recordAudio});
     S.stream=stream;
     const v=$('#video'); v.srcObject=stream; await v.play();
     S.feed='camera';
     v.style.display='block'; feedCanvas.style.display='none';
+    const wm=$('#wm'); if(wm) wm.style.display='block';
     startMotionDetect(); startGPS();
     toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6.8" width="18" height="13.4" rx="3"/><circle cx="12" cy="13.5" r="3.8"/><path d="M8.2 6.8 9.8 4.4h4.4l1.6 2.4"/></svg> Live camera active — you\u2019re streaming','ok');
   }catch(e){
@@ -1019,6 +1031,7 @@ function useDemoFeed(){
   if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stream=null;}
   stopGPS();
   S.feed='demo'; $('#video').style.display='none'; feedCanvas.style.display='block';
+  const wm=$('#wm'); if(wm) wm.style.display='none';
   S.motionBox=null; stopRecording(); toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M10 8.8 16 12l-6 3.2z"/></svg> Demo feed active','ok'); updateHUD();
 }
 /* ============================================================
@@ -1139,6 +1152,7 @@ async function persistSnapshot(){
 const Drive={
   clientId:'', token:null, tokenClient:null, connected:false, email:null, folderId:null, _lastEvent:0,
   queue:[], _processing:false, MAX_ATTEMPTS:6, _lastMeter:0,
+  RETENTION_LIMIT:12e9, RETENTION_DELETE:500e6, _lastSweep:0,
   online(){ return typeof navigator==='undefined'||navigator.onLine!==false; },
   backoff(a){ return Math.min(10000*Math.pow(2,a-1), 300000); }, // 10s..5min
   setClientId(id){ this.clientId=id||''; },
@@ -1273,7 +1287,7 @@ const Drive={
           await this.upload(item.name, item.blob, item.mime);
           await this.removeItem(item.id);
           toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.2 4.2 0 0 1-.5-8.4A5.7 5.7 0 0 1 17.8 9.2 4.3 4.3 0 0 1 17 18z"/></svg> Uploaded '+item.name,'ok');
-          renderClips(); this.refreshMeter(true);
+          renderClips(); this.refreshMeter(true); this.retentionSweep();
         }catch(e){
           item.uploading=false;
           if(e&&e.notEnabled){ item.failed=true; toast('☁️ Enable the Google Drive API in your Cloud project (Library → Google Drive API → Enable), then retry'); }
@@ -1366,6 +1380,35 @@ const Drive={
       downloadBlob(blob, name||'clip');
     }catch(e){ toast('Download failed'); }
   },
+  async deleteFile(id){
+    const r=await fetch('https://www.googleapis.com/drive/v3/files/'+id,{method:'DELETE',headers:{Authorization:'Bearer '+this.token}});
+    if(!r.ok){ const t=await r.text().catch(()=>''); throw new Error(t||('HTTP '+r.status)); }
+  },
+  /* Retention rule: keep the Drive folder <= 12 GB. Once past the limit,
+     each new addition deletes the OLDEST clips until >= 500 MB removed
+     (so adding ~250 MB triggers ~500 MB cleanup — folder always shrinks back). */
+  async retentionSweep(){
+    if(!this.connected) return;
+    const now=Date.now();
+    if(now-this._lastSweep<120000) return;   // at most once per 2 min
+    this._lastSweep=now;
+    try{
+      await this.ensureFolder();
+      const q=encodeURIComponent("'"+this.folderId+"' in parents and trashed=false");
+      const d=await this.api('GET','https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id,name,size,createdTime)&orderBy=createdTime&pageSize=1000');
+      const files=(d.files||[]).filter(f=>Number(f.size)>0);   // oldest first
+      const total=files.reduce((a,f)=>a+Number(f.size),0);
+      if(total<=this.RETENTION_LIMIT) return;
+      let deleted=0;
+      for(const f of files){
+        await this.deleteFile(f.id);
+        deleted+=Number(f.size);
+        if(deleted>=this.RETENTION_DELETE) break;
+      }
+      toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.2 4.2 0 0 1-.5-8.4A5.7 5.7 0 0 1 17.8 9.2 4.3 4.3 0 0 1 17 18z"/></svg> Drive cleanup: removed '+fmtBytes(deleted)+' of oldest clips to stay under 12 GB','ok');
+      this.refreshMeter(true); renderClips();
+    }catch(_){}
+  },
   async disconnect(){
     try{ if(this.token){ await fetch('https://oauth2.googleapis.com/revoke?token='+encodeURIComponent(this.token),{method:'POST'}); } }catch(_){}
     this.token=null; this.email=null; this.connected=false; this.folderId=null;
@@ -1378,6 +1421,43 @@ let drivePoll=0;
 function driveInitPoll(){
   if(typeof window!=='undefined'&&window.google&&window.google.accounts){ Drive.init(); try{ if(store.getItem('sdc_drive')==='1') setTimeout(()=>Drive.trySilent(),1500); }catch(_){} }
   else if(++drivePoll<60){ setTimeout(driveInitPoll,400); }
+}
+
+/* ============================================================
+   BURNED-IN WATERMARK — timestamp / speed / GPS drawn into the
+   recorded video via canvas.captureStream() composite
+   ============================================================ */
+let wmCanvas=null, wmCtx=null;
+function ensureWM(v){
+  if(!wmCanvas){ wmCanvas=document.createElement('canvas'); wmCtx=wmCanvas.getContext('2d'); }
+  const w=(v&&v.videoWidth)||1280, h=(v&&v.videoHeight)||720;
+  if(wmCanvas.width!==w||wmCanvas.height!==h){ wmCanvas.width=w; wmCanvas.height=h; }
+}
+function drawWatermarkFrame(v){
+  ensureWM(v);
+  if(!v.videoWidth||!v.videoHeight) return;
+  const W=wmCanvas.width, H=wmCanvas.height;
+  wmCtx.drawImage(v,0,0,W,H);
+  const fs=Math.max(14,Math.round(W/46));
+  const pad=Math.round(fs*0.7), lh=Math.round(fs*1.35);
+  const line1=fmtClock(new Date())+'   '+new Date().toLocaleDateString('en-CA');
+  const line2=Math.round(S.speed)+' km/h   '+S.gps.lat.toFixed(3)+','+S.gps.lng.toFixed(3);
+  const bh=lh*2+Math.round(pad*1.4);
+  wmCtx.fillStyle='rgba(0,0,0,.45)';
+  wmCtx.fillRect(0,H-bh,W,bh);
+  wmCtx.font='600 '+fs+'px Menlo, Consolas, "Courier New", monospace';
+  wmCtx.fillStyle='#ffffff';
+  wmCtx.textBaseline='top'; wmCtx.textAlign='left';
+  wmCtx.fillText(line1,pad,H-bh+Math.round(pad*0.7));
+  wmCtx.fillText(line2,pad,H-bh+Math.round(pad*0.7)+lh);
+  if(S.recording){
+    const cy=H-bh+Math.round(pad*0.7)+Math.round(lh*1.45);
+    wmCtx.fillStyle='#ff453a';
+    wmCtx.beginPath(); wmCtx.arc(pad+fs*0.35, cy+fs*0.35, fs*0.32, 0, 6.283); wmCtx.fill();
+    wmCtx.fillStyle='#ff8a80';
+    wmCtx.font='700 '+Math.round(fs*0.78)+'px Menlo, monospace';
+    wmCtx.fillText('REC', pad+fs*1.15, cy);
+  }
 }
 
 /* basic frame-diff motion detection */
@@ -1415,7 +1495,19 @@ function toggleRecording(){
 }
 function startRealRecorder(){
   if(!S.stream) return;
-  S.rec=new MediaRecorder(S.stream,{mimeType:'video/webm'});
+  // record the watermark canvas (burned-in timestamp/speed/GPS) + mic audio
+  let recStream=null;
+  if(!wmCanvas){ try{ ensureWM($('#video')); }catch(_){} }
+  if(wmCanvas && typeof wmCanvas.captureStream==='function'){
+    try{
+      const cs=wmCanvas.captureStream(30);
+      const tracks=cs.getVideoTracks();
+      if(settings.recordAudio && S.stream.getAudioTracks().length) tracks.push(S.stream.getAudioTracks()[0]);
+      recStream=new MediaStream(tracks);
+    }catch(_){}
+  }
+  if(!recStream) recStream=S.stream;
+  S.rec=new MediaRecorder(recStream,{mimeType:'video/webm'});
   S.chunks=[];
   S.rec.ondataavailable=e=>{if(e.data.size)S.chunks.push(e.data);};
   S.rec.onstop=()=>{
@@ -1462,6 +1554,8 @@ function frame(now){
     if(!S.lowPower)updateScenario(dt);
     draw(); updateBoxes();
   } else {
+    const v=$('#video');
+    if(v&&v.videoWidth){ drawWatermarkFrame(v); }
     detectMotion(); updateBoxes();
   }
   // speed simulation (demo feed only — real camera uses GPS speed)
@@ -1500,8 +1594,11 @@ function toggleTalk(){
   if(!S.talk){
     S.talk=true;
     toast('<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8.8" y="2.8" width="6.4" height="11" rx="3.2"/><path d="M5 11.5a7 7 0 0 0 14 0"/><path d="M12 18.5V21"/></svg> Two-way talk open — speaking through the camera','ok');
-    if(settings.twoWay&&S.feed==='camera'&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
-      navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{S.micStream=s;S.micOn=true;}).catch(()=>{});
+    if(settings.twoWay&&S.feed==='camera'){
+      if(S.stream&&S.stream.getAudioTracks().length){ S.micOn=true; }
+      else if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
+        navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{S.micStream=s;S.micOn=true;}).catch(()=>{});
+      }
     }
   } else {
     S.talk=false; S.micOn=false;
@@ -1608,6 +1705,10 @@ function bind(){
         if(k==='zonesOn'){S.zonesOn=settings.zonesOn;$('#zones').classList.toggle('on',S.mode==='parking'&&S.zonesOn);}
         if(k==='lowPower'){S.lowPower=settings.lowPower;updateHUD();}
         if(k==='autoStart'&&settings.autoStart&&!S.recording){toggleRecording();}
+        if(k==='recordAudio'&&S.feed==='camera'){
+          const wasRec=S.recording; stopRecording();
+          enableCamera().then(()=>{ if(wasRec&&settings.autoStart){ try{ startRealRecorder(); }catch(_){ S.recording=true; } } });
+        }
         updateDetectVal();
       });}
     else{el.value=settings[k];
@@ -1629,7 +1730,8 @@ async function start(useDemo){
   } else {
     await enableCamera(); // falls back to demo automatically if unavailable/blocked
   }
-  // auto-start recording
+  // auto-start recording (brief delay lets the video dims settle for the watermark canvas)
+  await new Promise(r=>setTimeout(r,300));
   if(settings.autoStart && !S.recording){
     if(S.feed==='camera'){
       try{ startRealRecorder(); addEvent('system','Loop recording ON (real)','Auto-start: recording began when power was applied.'); }
@@ -1646,6 +1748,17 @@ FS.init().then(()=>{ refreshStorage(); setInterval(refreshStorage,15000); Drive.
 Drive.setClientId(settings.driveClientId||'');
 { const inp=$('#driveClientIdInput'); if(inp) inp.value=settings.driveClientId||''; }
 if(settings.driveClientId) driveInitPoll();
+
+/* real accelerometer impact detection (devicemotion) */
+if(typeof window!=='undefined' && 'DeviceMotionEvent' in window){
+  window.addEventListener('devicemotion', e=>{
+    if(S.feed!=='camera'||S.lowPower) return;
+    const a=e.acceleration||e.accelerationIncludingGravity;
+    if(!a) return;
+    const mag=Math.sqrt((a.x||0)*(a.x||0)+(a.y||0)*(a.y||0)+(a.z||0)*(a.z||0));
+    if(mag>25) realImpact(mag/9.81);
+  });
+}
 setInterval(()=>Drive.processQueue(), 8000);
 if(typeof window!=='undefined'){ window.addEventListener('online',()=>{ Drive.processQueue(); }); }
 try{ if(store.getItem('sdc_seen')){ $('#welcome').style.display='none'; start(false);} else { $('#welcome').style.display='grid'; } }
