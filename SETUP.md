@@ -1,6 +1,8 @@
 # ✅ Smart Dash Cam — One-Page Setup Checklist
 
 > Go from repo → working two-phone security cam in one sitting.
+> **Prefer click-by-click detail?** See **[STEP-BY-STEP.md](STEP-BY-STEP.md)** — every menu,
+> button and field spelled out, with a troubleshooting table at the end.
 > The app is already live at **https://successpartner10.github.io/dash/** — this page is
 > only about the **3 keys** that make the cloud features real. Everything else works with
 > zero setup (demo feed, camera, GPS, recording, AI detection, timeline).
