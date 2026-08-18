@@ -24,15 +24,18 @@ They're stored **only in that browser**, never sent anywhere but Google/Supabase
 
 ## 1️⃣ Google Drive cloud clips (~5 min)
 
+> ⚠️ 2024+ console UI: the old "OAuth consent screen" is now **Google Auth Platform**
+> (Branding / Audience / Data Access / Clients). Full click-by-click: **STEP-BY-STEP.md**.
+
 1. **console.cloud.google.com** → sign in with your Gmail → **Create project** (`smart-dash-cam`).
 2. **APIs & Services → Library** → search **Google Drive API** → **Enable**.
-3. **APIs & Services → OAuth consent screen** → **External** → name it `Smart Dash Cam`,
-   add your email (support + developer).
-   - **Scopes** → add `.../auth/drive.file`
-   - **Test users** → add your Gmail (leave the app in *Testing*).
-4. **Credentials → Create OAuth client ID → Web application**:
-   - **Authorized JavaScript origins** → exactly `https://successpartner10.github.io` (no slash, no www).
-5. Copy the **Client ID** → app → **Settings → Cloud** → paste → **Save** → **🔑 Sign in**.
+3. **APIs & Services → Google Auth Platform** (or `console.cloud.google.com/auth/branding`):
+   - **Branding** → App name `Smart Dash Cam` + your email (support + developer contact).
+   - **Audience** → **External** → add your Gmail under **Test users**.
+   - **Data Access** → add scope `.../auth/drive.file`.
+   - **Clients** → **Create client** → Web application → **Authorized JavaScript origins**
+     → exactly `https://successpartner10.github.io` (no slash, no www).
+4. Copy the **Client ID** → app → **Settings → Cloud** → paste → **Save** → **🔑 Sign in**.
 
 **Result:** protected clips auto-upload to a **"Smart Dash Cam"** folder in your Drive,
 kept ≤ 12 GB automatically, visible from any device signed into that Gmail.

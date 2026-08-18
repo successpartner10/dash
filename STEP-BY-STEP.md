@@ -57,31 +57,34 @@ denied — open the github.io URL in the address bar and tap Allow.
 4. Wait for it to finish (a few seconds). ← *This is the step that can't be skipped; without
    it, uploads fail with "Drive API has not been used in project".*
 
-## B3. Consent screen
-1. Left menu → **APIs & Services** → **OAuth consent screen**.
-2. **User type:** `External` → **CREATE**.
-3. Fill in:
+## B3. Consent screen (new "Google Auth Platform" UI — 2024+)
+> Google renamed this in 2024: the old "OAuth consent screen" menu is now **Google Auth
+> Platform**, split into **Branding / Audience / Data Access / Clients** tabs. If you don't
+> see "Google Auth Platform" under APIs & Services, paste this URL:
+> `https://console.cloud.google.com/auth/branding`
+1. Left menu → **APIs & Services** → **Google Auth Platform**.
+2. If it says **"Google Auth Platform not configured yet"** → click **Get Started**.
+3. **Branding** tab:
    - **App name:** `Smart Dash Cam`
    - **User support email:** your Gmail
-   - **Developer contact information** (bottom): your Gmail
-4. Click **SAVE AND CONTINUE**.
-5. **Scopes** page → click **ADD OR REMOVE SCOPES** → search `drive.file` → tick the checkbox
-   for **`.../auth/drive.file`** → **UPDATE** → **SAVE AND CONTINUE**.
-6. **Test users** page → **ADD USERS** → type your Gmail → **ADD** → **SAVE AND CONTINUE** →
-   **BACK TO DASHBOARD**.
+   - **Developer contact email** (bottom): your Gmail
+   - **Save**.
+4. **Audience** tab:
+   - Select **External**.
+   - **Test users** section → **Add users** → your Gmail → **Save**.
    > This is what stops the "Access blocked / app not verified" screen — your Gmail must be
    > listed here while the app is in *Testing* mode.
+5. **Data Access** tab:
+   - **Add or remove scopes** → search `drive.file` → tick **`.../auth/drive.file`** → **Save**.
 
 ## B4. Create the Client ID
-1. Left menu → **APIs & Services** → **Credentials**.
-2. Click **+ CREATE CREDENTIALS** → **OAuth client ID**.
-3. **Application type:** `Web application` → **Name:** `Smart Dash Cam`.
-4. **Authorized JavaScript origins** → **+ ADD URI** → paste exactly:
+1. **Clients** tab (still inside Google Auth Platform) → **Create client**.
+2. **Application type:** `Web application` → **Name:** `Smart Dash Cam`.
+3. **Authorized JavaScript origins** → **+ Add URI** → paste exactly:
    `https://successpartner10.github.io`
    > No trailing slash, no `www`, no path.
-5. Click **CREATE**.
-6. A popup shows your **Client ID** (looks like `1234567890-abc...apps.googleusercontent.com`).
-   **Copy it.**
+4. Click **Create**.
+5. Copy the **Client ID** (looks like `1234567890-abc...apps.googleusercontent.com`).
 
 ## B5. Paste it into the app
 1. In the app → tap **⚙️ Settings** (gear top-right) or the **Settings** tab.
@@ -179,9 +182,9 @@ OLD PHONE (camera)                        DAILY PHONE (viewer)
 | Symptom | Fix |
 |---|---|
 | Camera shows demo, not real | Use the **github.io URL in the address bar**; tap Allow |
-| "Access blocked / app not verified" | Add your Gmail under **Test users** (B3.6) |
+| "Access blocked / app not verified" | Add your Gmail under **Test users** (B3, Audience tab) |
 | Drive upload fails | **Enable the Google Drive API** (B2) |
-| Drive sign-in popup won't open | Origins must be exactly `https://successpartner10.github.io` (B4.4); allow popups |
+| Drive sign-in popup won't open | Origins must be exactly `https://successpartner10.github.io` (B4, Clients tab); allow popups |
 | Remote: no video | Same room code both phones; camera broadcasting; add TURN (Part D) |
 | Supabase "load fail" | Wrong Project URL or anon key (C2) |
 | No GPS fix | Outdoors; grant location; enable high-accuracy |
